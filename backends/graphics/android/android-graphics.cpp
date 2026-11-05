@@ -38,6 +38,9 @@
 
 #include "backends/platform/android/android.h"
 #include "backends/platform/android/jni-android.h"
+#ifdef USE_JNANINVR
+#include "backends/xr/xr.h"
+#endif
 #include "backends/graphics/android/android-graphics.h"
 #include "backends/graphics/opengl/pipelines/pipeline.h"
 #include "backends/graphics/opengl/texture.h"
@@ -118,6 +121,9 @@ void AndroidGraphicsManager::deinitSurface() {
 		_touchcontrols->destroy();
 	}
 
+#ifdef USE_JNANINVR
+	XR::shutdown();
+#endif
 	notifyContextDestroy();
 
 	JNI::deinitSurface();
@@ -245,7 +251,13 @@ void AndroidGraphicsManager::refreshScreen() {
 	// Last minute draw of touch controls
 	dynamic_cast<OSystem_Android *>(g_system)->getTouchControls().draw();
 
+#ifdef USE_JNANINVR
+	XR::captureBackbuffer();
+#endif
 	JNI::swapBuffers();
+#ifdef USE_JNANINVR
+	XR::pump();
+#endif
 }
 
 void AndroidGraphicsManager::applyTouchSettings() const {

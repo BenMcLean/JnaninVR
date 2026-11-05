@@ -78,7 +78,7 @@ void Transition::draw(TransitionType type) {
 		return;
 	}
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	if (_vm->shouldSkipTransitionForXR())
 		return;
 #endif

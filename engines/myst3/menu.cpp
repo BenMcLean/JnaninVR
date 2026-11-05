@@ -610,6 +610,9 @@ void PagingMenu::saveMenuOpen() {
 
 	_saveLoadAgeName = getAgeLabel(_vm->_state);
 	_saveCaretCounter = kCaretSpeed;
+#ifdef USE_JNANINVR
+	_saveName = defaultSaveName();
+#endif
 
 	_vm->_state->setMenuSaveLoadCurrentPage(0);
 	saveLoadUpdateVars();
@@ -618,6 +621,28 @@ void PagingMenu::saveMenuOpen() {
 	if (_saveLoadSpotItem && _saveThumbnail)
 		_saveLoadSpotItem->updateData(_saveThumbnail.get());
 }
+
+#ifdef USE_JNANINVR
+// "ROOM yyMMdd HHmm", which fits the 17 characters of the save name field
+Common::String PagingMenu::defaultSaveName() const {
+	uint32 room = _vm->_state->getLocationRoom();
+	uint32 age = _vm->_state->getLocationAge();
+	if (room == kRoomMenu) {
+		room = _vm->_state->getMenuSavedRoom();
+		age = _vm->_state->getMenuSavedAge();
+	}
+
+	if (age == 0)
+		return Common::String();
+
+	TimeDate t;
+	g_system->getTimeAndDate(t);
+
+	return Common::String::format("%s %02d%02d%02d %02d%02d",
+			_vm->_db->getRoomName(room, age).c_str(),
+			(t.tm_year + 1900) % 100, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min);
+}
+#endif
 
 void PagingMenu::saveMenuSelect(uint16 item) {
 	_vm->_state->setMenuSaveLoadSelectedItem(item);

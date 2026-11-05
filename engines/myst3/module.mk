@@ -34,7 +34,7 @@ MODULE_OBJS += \
 	gfx_tinygl_texture.o
 endif
 
-ifdef USE_OPENXR
+ifdef USE_JNANINVR
 MODULE_OBJS += \
 	xr.o
 endif

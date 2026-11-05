@@ -191,11 +191,27 @@ MODULE_OBJS += \
 	vkeybd/virtual-keyboard-parser.o
 endif
 
-# OpenXR (VR headset) support
+# JnaninVR (VR headset and Cardboard) support
+ifdef USE_JNANINVR
+MODULE_OBJS += \
+	xr/xr.o \
+	xr/xr-controls.o \
+	xr/xr-android.o \
+	xr/xr-gl.o \
+	xr/xr-sdl.o \
+	xr/xr-theatre.o
+endif
+
+ifdef USE_CARDBOARD
+MODULE_OBJS += \
+	xr/cardboard-backend.o
+endif
+
 ifdef USE_OPENXR
 MODULE_OBJS += \
-	xr/openxr-sdl.o \
-	xr/openxr-theatre.o
+	xr/openxr-android.o \
+	xr/openxr-backend.o \
+	xr/openxr-sdl.o
 endif
 
 # OpenGL specific source files.

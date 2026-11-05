@@ -24,7 +24,7 @@ android {
     enableKotlin = false
 
     defaultConfig {
-        applicationId "org.scummvm.scummvm"
+        applicationId "net.benmclean.jnaninvr"
 
         minSdkVersion 16
 

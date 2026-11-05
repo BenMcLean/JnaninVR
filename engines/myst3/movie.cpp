@@ -98,7 +98,7 @@ void Movie::loadPosition(const ResourceDescription::VideoData &videoData) {
 
 	Math::Vector3d planeDirection = videoData.v1;
 	planeDirection.normalize();
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	_startDirection = planeDirection;
 #endif
 
@@ -130,7 +130,7 @@ void Movie::loadPosition(const ResourceDescription::VideoData &videoData) {
 	_posV = videoData.v;
 }
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 void Movie::setWorldPlacement(float fov) {
 	static const float scale = 50.0f;
 

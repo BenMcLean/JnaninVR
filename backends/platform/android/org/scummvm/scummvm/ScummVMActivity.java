@@ -742,6 +742,11 @@ public class ScummVMActivity extends Activity {
 		}
 
 		@Override
+		protected android.content.Context getXRContext() {
+			return ScummVMActivity.this;
+		}
+
+		@Override
 		protected void getDPI(float[] values) {
 			Resources resources = getResources();
 

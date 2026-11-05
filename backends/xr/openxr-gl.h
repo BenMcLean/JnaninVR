@@ -26,40 +26,17 @@
 
 #ifdef USE_OPENXR
 
-/**
- * OpenGL flavor used by the OpenXR code. Headsets provide desktop OpenGL 4.x
- * or OpenGL ES 3.x, so framebuffer objects and blits are always assumed.
- */
-#if defined(__ANDROID__) || (defined(USE_GLES_MODE) && USE_GLES_MODE != 0)
-#define XR_GL_ES
-#endif
-
-#ifdef WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <unknwn.h>
-#endif
+#include "backends/xr/xr-gl.h"
 
 #ifdef XR_GL_ES
-#include <GLES3/gl3.h>
 #define XR_USE_GRAPHICS_API_OPENGL_ES
 #else
-#include <GL/gl.h>
-#include <GL/glext.h>
 #define XR_USE_GRAPHICS_API_OPENGL
 #endif
 
 // A XR_USE_PLATFORM_* macro for the window system binding may be defined before including this file
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
-
-#if defined(GL_APIENTRY)
-#define XR_GL_CALL GL_APIENTRY
-#elif defined(APIENTRY)
-#define XR_GL_CALL APIENTRY
-#else
-#define XR_GL_CALL
-#endif
 
 namespace XR {
 
@@ -70,34 +47,6 @@ const XrStructureType kSwapchainImageType = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_ES_KH
 typedef XrSwapchainImageOpenGLKHR SwapchainImage;
 const XrStructureType kSwapchainImageType = XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR;
 #endif
-
-/** The GL entry points used by the OpenXR code, loaded at runtime. */
-struct GLFuncs {
-	void (XR_GL_CALL *genFramebuffers)(GLsizei, GLuint *);
-	void (XR_GL_CALL *deleteFramebuffers)(GLsizei, const GLuint *);
-	void (XR_GL_CALL *bindFramebuffer)(GLenum, GLuint);
-	void (XR_GL_CALL *framebufferTexture2D)(GLenum, GLenum, GLenum, GLuint, GLint);
-	void (XR_GL_CALL *blitFramebuffer)(GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
-	void (XR_GL_CALL *genRenderbuffers)(GLsizei, GLuint *);
-	void (XR_GL_CALL *bindRenderbuffer)(GLenum, GLuint);
-	void (XR_GL_CALL *renderbufferStorage)(GLenum, GLenum, GLsizei, GLsizei);
-	void (XR_GL_CALL *framebufferRenderbuffer)(GLenum, GLenum, GLenum, GLuint);
-	void (XR_GL_CALL *deleteRenderbuffers)(GLsizei, const GLuint *);
-	void (XR_GL_CALL *deleteTextures)(GLsizei, const GLuint *);
-	void (XR_GL_CALL *genTextures)(GLsizei, GLuint *);
-	void (XR_GL_CALL *bindTexture)(GLenum, GLuint);
-	void (XR_GL_CALL *texImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void *);
-	void (XR_GL_CALL *getIntegerv)(GLenum, GLint *);
-	GLboolean (XR_GL_CALL *isEnabled)(GLenum);
-	void (XR_GL_CALL *enable)(GLenum);
-	void (XR_GL_CALL *disable)(GLenum);
-	void (XR_GL_CALL *finish)();
-	void (XR_GL_CALL *viewport)(GLint, GLint, GLsizei, GLsizei);
-	void (XR_GL_CALL *clear)(GLbitfield);
-	void (XR_GL_CALL *clearColor)(GLfloat, GLfloat, GLfloat, GLfloat);
-	void (XR_GL_CALL *depthMask)(GLboolean);
-	void (XR_GL_CALL *colorMask)(GLboolean, GLboolean, GLboolean, GLboolean);
-};
 
 } // End of namespace XR
 

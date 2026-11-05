@@ -159,7 +159,7 @@ public:
 
 	void setupCameraPerspective(float pitch, float heading, float fov);
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	/** Whether the renderer can draw into an XR eye target */
 	virtual bool supportsXR() const { return false; }
 
@@ -202,7 +202,7 @@ protected:
 
 	Math::Frustum _frustum;
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	Common::Rect _xrTarget;
 #endif
 

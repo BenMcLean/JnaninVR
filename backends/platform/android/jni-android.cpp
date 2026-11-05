@@ -772,6 +772,14 @@ int JNI::fetchEGLVersion() {
 
 // natives for the dark side
 
+jobject JNI::getXRContext() {
+	JNIEnv *env = getEnv();
+	jmethodID method = env->GetMethodID(env->GetObjectClass(_jobj), "getXRContext", "()Landroid/content/Context;");
+	if (!method)
+		return nullptr;
+	return env->CallObjectMethod(_jobj, method);
+}
+
 void JNI::create(JNIEnv *env, jobject self, jobject asset_manager,
 				jobject egl, jobject egl_display,
 				jboolean assets_updated_) {

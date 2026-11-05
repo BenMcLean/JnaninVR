@@ -23,8 +23,8 @@
 #include "backends/graphics/opengl/texture.h"
 #include "backends/events/sdl/sdl-events.h"
 #include "backends/platform/sdl/sdl.h"
-#ifdef USE_OPENXR
-#include "backends/xr/openxr-theatre.h"
+#ifdef USE_JNANINVR
+#include "backends/xr/xr.h"
 #endif
 #include "graphics/scaler/aspect.h"
 #ifdef USE_SCALERS
@@ -230,7 +230,7 @@ OpenGLSdlGraphicsManager::~OpenGLSdlGraphicsManager() {
 }
 
 void OpenGLSdlGraphicsManager::deinitOpenGLContext() {
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	XR::shutdown();
 #endif
 #if SDL_VERSION_ATLEAST(2, 0, 0)
@@ -404,7 +404,7 @@ void OpenGLSdlGraphicsManager::updateScreen() {
 
 	OpenGLGraphicsManager::updateScreen();
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	XR::pump();
 #endif
 }
@@ -644,7 +644,7 @@ void OpenGLSdlGraphicsManager::refreshScreen() {
 	renderImGui();
 #endif
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	XR::captureBackbuffer();
 #endif
 

@@ -155,7 +155,7 @@ void ShaderRenderer::clear() {
 }
 
 void ShaderRenderer::selectTargetWindow(Window *window, bool is3D, bool scaled) {
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	if (!_xrTarget.isEmpty()) {
 		glViewport(0, 0, _xrTarget.width(), _xrTarget.height());
 		_currentViewport = _xrTarget;
@@ -377,7 +377,7 @@ void ShaderRenderer::drawTexturedRect3D(const Math::Vector3d &topLeft, const Mat
 	glDepthMask(GL_TRUE);
 }
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 void ShaderRenderer::drawTexturedRect3D(const Math::Vector3d &topLeft, const Math::Vector3d &bottomLeft,
 	                                const Math::Vector3d &topRight, const Math::Vector3d &bottomRight,
 	                                const Common::Rect &textureRect, Texture *texture) {

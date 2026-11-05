@@ -25,15 +25,15 @@
 #include "engines/myst3/scene.h"
 #include "engines/myst3/state.h"
 
-#ifdef USE_OPENXR
-#include "backends/xr/openxr-theatre.h"
+#ifdef USE_JNANINVR
+#include "backends/xr/xr.h"
 
 #include "math/utils.h"
 #endif
 
 namespace Myst3 {
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 // Distance of the panel in the panorama, and the angle covered by one of its pixels
 static const float kXRPanelDistance = 50.0f;
 static const float kXRPanelPixelAngle = 0.15f;
@@ -55,7 +55,7 @@ Inventory::Inventory(Myst3Engine *vm) :
 		Window(),
 		_vm(vm),
 		_texture(nullptr)
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 		, _xrShown(false)
 		, _xrBackdrop(nullptr)
 #endif
@@ -67,7 +67,7 @@ Inventory::Inventory(Myst3Engine *vm) :
 
 Inventory::~Inventory() {
 	delete _texture;
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	delete _xrBackdrop;
 #endif
 }
@@ -82,7 +82,7 @@ void Inventory::initializeTexture() {
 }
 
 bool Inventory::isMouseInside() {
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	if (useXRPointer()) {
 		Common::Point point;
 		return _xrShown && getXRPanelPoint(point) && getXRPanelRect().contains(point);
@@ -262,7 +262,7 @@ void Inventory::reflow() {
 
 uint16 Inventory::hoveredItem() {
 	Common::Point mouse;
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	if (useXRPointer()) {
 		if (!getXRPanelPoint(mouse))
 			return 0;
@@ -282,7 +282,7 @@ uint16 Inventory::hoveredItem() {
 }
 
 void Inventory::useItem(uint16 var) {
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	_xrShown = false;
 #endif
 
@@ -406,7 +406,7 @@ void Inventory::updateCursor() {
 	}
 }
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 bool Inventory::useXRPointer() const {
 	return XR::isStereoActive() && _vm->_state->getViewType() == kCube;
 }

@@ -58,7 +58,7 @@ void Scene::updateCamera(Common::Point &mouse) {
 		heading += mouse.x * speed;
 	}
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	applyHeadTracking(pitch, heading);
 #endif
 
@@ -98,7 +98,7 @@ void Scene::updateCamera(Common::Point &mouse) {
 
 	pitch = CLIP(pitch, minPitch, maxPitch);
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	_xrLastHeading = heading;
 #endif
 

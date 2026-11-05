@@ -37,7 +37,7 @@ private:
 
 	uint _mouseSpeed;
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	float _xrYawOffset = 0.0f;
 	float _xrLastHeading = 0.0f;
 	bool _xrHaveLast = false;
@@ -57,7 +57,7 @@ public:
 	void screenPosToDirection(const Common::Point &screen, float &pitch, float &heading) const;
 	static Math::Vector3d directionToVector(float pitch, float heading);
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	/** Whether the headset is currently driving the camera */
 	bool isXRActive() const;
 

@@ -23,7 +23,7 @@ permissions:
 env:
   # Space separated engine names with VR support, as given to configure --enable-engine=
   ENGINES: myst3
-  CONFIGURE_FLAGS: --disable-all-engines --enable-openxr --enable-release
+  CONFIGURE_FLAGS: --disable-all-engines --enable-openxr --disable-cjk-languages --enable-release
   # Versions of the libraries that are built from source, so every release is reproducible
   OPENXR_VERSION: 1.1.40
   SDL2_VERSION: 2.30.9

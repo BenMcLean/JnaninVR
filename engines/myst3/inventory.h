@@ -70,7 +70,7 @@ public:
 
 	void draw() override;
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	bool isXRShown() const { return _xrShown; }
 
 	/** Show the inventory in front of the given direction, or hide it */
@@ -112,7 +112,7 @@ private:
 	void openBook(uint16 age, uint16 room, uint16 node);
 	void closeAllBooks();
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	bool _xrShown;
 	Math::Vector3d _xrForward, _xrRight, _xrUp;
 	Texture *_xrBackdrop;

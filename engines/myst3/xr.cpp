@@ -21,7 +21,7 @@
 
 #include "common/scummsys.h"
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 
 #include "engines/myst3/myst3.h"
 #include "engines/myst3/cursor.h"
@@ -32,7 +32,7 @@
 #include "engines/myst3/scene.h"
 #include "engines/myst3/state.h"
 
-#include "backends/xr/openxr-theatre.h"
+#include "backends/xr/xr.h"
 
 #include "math/glmath.h"
 #include "math/matrix4.h"
@@ -226,4 +226,4 @@ void Myst3Engine::drawStereoPanorama() {
 
 } // End of namespace Myst3
 
-#endif // USE_OPENXR
+#endif // USE_JNANINVR

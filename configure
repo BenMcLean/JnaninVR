@@ -176,6 +176,8 @@ _gif=auto
 _sjis=auto
 _theoradec=auto
 _openxr=no
+_cardboard=no
+_cjk_languages=yes
 _vpx=auto
 _faad=auto
 _fluidsynth=auto
@@ -363,6 +365,8 @@ add_component mfc "MFC" "_mfc" "USE_MFC"
 add_component vpx "libvpx" "_vpx" "USE_VPX"
 add_component theoradec "libtheoradec" "_theoradec" "USE_THEORADEC"
 add_feature openxr "OpenXR" "_openxr" "USE_OPENXR"
+add_feature cardboard "Cardboard" "_cardboard" "USE_CARDBOARD"
+add_feature jnaninvr "JnaninVR" "_jnaninvr" "USE_JNANINVR"
 add_component midi "MIDI synthesis" "_midi" "USE_MIDI"
 add_component mpc "MPC" "_libmpcdec" "USE_MPCDEC"
 add_component mpeg2 "mpeg2" "_mpeg2" "USE_MPEG2"
@@ -1168,7 +1172,11 @@ Optional Libraries:
   --disable-theoradec         disable Theora decoder [autodetect]
 
   --with-openxr-prefix=DIR    prefix where OpenXR is installed (optional)
+  --with-cardboard-prefix=DIR prefix where the Cardboard SDK is installed (optional)
   --enable-openxr             enable OpenXR (VR headset) support [no]
+  --enable-cardboard          enable Cardboard (phone VR viewer) support, Android only [no]
+  --disable-cjk-languages     do not offer the Chinese, Japanese and Korean GUI languages,
+                              whose fonts (fonts-cjk.dat) are then not needed [no]
 
   --with-vpx-prefix=DIR    prefix where libtvpx is installed (optional)
   --disable-vpx            disable VP8/VP9 decoder [autodetect]
@@ -1289,6 +1297,7 @@ JPEG_LIBS=-ljpeg
 FLAC_LIBS=-lFLAC
 THEORADEC_LIBS=-ltheoradec
 OPENXR_LIBS=-lopenxr_loader
+CARDBOARD_LIBS=-lcardboard_api
 
 for ac_option in $@; do
 	case "$ac_option" in
@@ -1377,6 +1386,10 @@ for ac_option in $@; do
 	--enable-theoradec)           _theoradec=yes         ;;
 	--disable-openxr)             _openxr=no             ;;
 	--enable-openxr)              _openxr=yes            ;;
+	--disable-cardboard)          _cardboard=no          ;;
+	--enable-cardboard)           _cardboard=yes         ;;
+	--disable-cjk-languages)      _cjk_languages=no      ;;
+	--enable-cjk-languages)       _cjk_languages=yes     ;;
 	--disable-vpx)                _vpx=no                ;;
 	--enable-vpx)                 _vpx=yes               ;;
 	--disable-faad)               _faad=no               ;;
@@ -1566,6 +1579,11 @@ for ac_option in $@; do
 		arg=`echo $ac_option | cut -d '=' -f 2`
 		GIF_CFLAGS="-I$arg/include"
 		GIF_LIBS="-L$arg/lib"
+		;;
+	--with-cardboard-prefix=*)
+		arg=`echo $_option | sed "s/^--with-cardboard-prefix=//"`
+		CARDBOARD_CFLAGS="-I$arg/include"
+		CARDBOARD_LIBS="-L$arg/lib -lcardboard_api"
 		;;
 	--with-openxr-prefix=*)
 		arg=`echo $ac_option | cut -d '=' -f 2`
@@ -5902,8 +5920,8 @@ fi
 # Check for OpenXR (optional, VR headset support; never autodetected)
 #
 echocheck "OpenXR"
-if test "$_openxr" = yes && test "$_backend" != sdl ; then
-	# The only platform layer so far is backends/xr/openxr-sdl.cpp
+if test "$_openxr" = yes && test "$_backend" != sdl && test "$_backend" != android ; then
+	# The platform layers are backends/xr/openxr-sdl.cpp and openxr-android.cpp
 	_openxr=no
 fi
 if test "$_openxr" = yes ; then
@@ -5919,6 +5937,41 @@ if test "$_openxr" = yes ; then
 	define_in_config_if_yes "$_openxr" 'USE_OPENXR'
 fi
 echo "$_openxr"
+
+#
+# Check for the Cardboard SDK (optional, phone VR viewer support, Android only; never autodetected)
+#
+echocheck "Cardboard"
+if test "$_cardboard" = yes && test "$_backend" != android ; then
+	_cardboard=no
+fi
+if test "$_cardboard" = yes ; then
+	cat > $TMPC << EOF
+#include <cardboard.h>
+int main(void) { CardboardHeadTracker_create(); return 0; }
+EOF
+	cc_check $CARDBOARD_CFLAGS $CARDBOARD_LIBS || _cardboard=no
+fi
+if test "$_cardboard" = yes ; then
+	append_var LIBS "$CARDBOARD_LIBS"
+	append_var INCLUDES "$CARDBOARD_CFLAGS"
+fi
+define_in_config_if_yes "$_cardboard" 'USE_CARDBOARD'
+echo "$_cardboard"
+
+#
+# Optional exclusion of the CJK GUI languages
+#
+define_in_config_if_no "$_cjk_languages" 'DISABLE_CJK_LANGUAGES'
+
+#
+# JnaninVR: engine-side VR support, enabled by any VR backend
+#
+_jnaninvr=no
+if test "$_openxr" = yes || test "$_cardboard" = yes ; then
+	_jnaninvr=yes
+fi
+define_in_config_if_yes "$_jnaninvr" 'USE_JNANINVR'
 
 #
 # Check for VP8/VP9 Decoder

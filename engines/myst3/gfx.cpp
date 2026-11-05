@@ -169,7 +169,7 @@ void Renderer::setupCameraPerspective(float pitch, float heading, float fov) {
 	_mvpMatrix.transpose();
 }
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 void Renderer::setupCameraXR(const Math::Matrix4 &projection, const Math::Matrix4 &modelView) {
 	_projectionMatrix = projection;
 	_modelViewMatrix = modelView;

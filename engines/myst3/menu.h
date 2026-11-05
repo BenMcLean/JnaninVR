@@ -128,6 +128,9 @@ private:
 	void loadMenuLoad();
 	void loadMenuChangePage();
 	void saveMenuOpen();
+#ifdef USE_JNANINVR
+	Common::String defaultSaveName() const;
+#endif
 	void saveMenuSelect(uint16 item);
 	void saveMenuChangePage();
 	void saveMenuSave();

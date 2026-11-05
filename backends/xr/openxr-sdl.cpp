@@ -70,10 +70,6 @@ T xrStruct(XrStructureType type) {
 
 } // End of anonymous namespace
 
-bool isRequested() {
-	return getenv("SCUMMVM_XR") != nullptr;
-}
-
 bool initLoader() {
 	return true;
 }
@@ -96,11 +92,11 @@ bool init() {
 	typedef void (*QueryDrawableFn)(Display *, GLXDrawable, int, unsigned int *);
 	typedef GLXFBConfig *(*ChooseFBConfigFn)(Display *, int, const int *, int *);
 	typedef int (*GetFBConfigAttribFn)(Display *, GLXFBConfig, int, int *);
-	GetCurrentContextFn getCurrentContext = (GetCurrentContextFn)getProcAddress("glXGetCurrentContext");
-	GetCurrentDrawableFn getCurrentDrawable = (GetCurrentDrawableFn)getProcAddress("glXGetCurrentDrawable");
-	QueryDrawableFn queryDrawable = (QueryDrawableFn)getProcAddress("glXQueryDrawable");
-	ChooseFBConfigFn chooseFBConfig = (ChooseFBConfigFn)getProcAddress("glXChooseFBConfig");
-	GetFBConfigAttribFn getFBConfigAttrib = (GetFBConfigAttribFn)getProcAddress("glXGetFBConfigAttrib");
+	GetCurrentContextFn getCurrentContext = (GetCurrentContextFn)SDL_GL_GetProcAddress("glXGetCurrentContext");
+	GetCurrentDrawableFn getCurrentDrawable = (GetCurrentDrawableFn)(void *)SDL_GL_GetProcAddress("glXGetCurrentDrawable");
+	QueryDrawableFn queryDrawable = (QueryDrawableFn)(void *)SDL_GL_GetProcAddress("glXQueryDrawable");
+	ChooseFBConfigFn chooseFBConfig = (ChooseFBConfigFn)(void *)SDL_GL_GetProcAddress("glXChooseFBConfig");
+	GetFBConfigAttribFn getFBConfigAttrib = (GetFBConfigAttribFn)(void *)SDL_GL_GetProcAddress("glXGetFBConfigAttrib");
 	if (!getCurrentContext || !getCurrentDrawable || !queryDrawable || !chooseFBConfig || !getFBConfigAttrib) {
 		warning("OpenXR: GLX entry points not available");
 		return false;
@@ -128,10 +124,6 @@ bool init() {
 #endif
 
 	return true;
-}
-
-void *getProcAddress(const char *name) {
-	return SDL_GL_GetProcAddress(name);
 }
 
 void getExtensions(Common::Array<const char *> &extensions) {
@@ -175,48 +167,6 @@ bool createSession(XrInstance instance, XrSystemId systemId, XrSession &session)
 #endif
 	sessionInfo.next = &binding;
 	return XR_SUCCEEDED(xrCreateSession(instance, &sessionInfo, &session));
-}
-
-void getWindowSize(int &width, int &height) {
-	SDL_GetWindowSize(g_window, &width, &height);
-}
-
-void getDrawableSize(int &width, int &height) {
-	SDL_GL_GetDrawableSize(g_window, &width, &height);
-}
-
-void pushMouseMotion(int x, int y) {
-	SDL_Event ev;
-	memset(&ev, 0, sizeof(ev));
-	ev.type = SDL_MOUSEMOTION;
-	ev.motion.windowID = SDL_GetWindowID(g_window);
-	ev.motion.x = x;
-	ev.motion.y = y;
-	SDL_PushEvent(&ev);
-}
-
-void pushMouseButton(bool down, int x, int y) {
-	SDL_Event ev;
-	memset(&ev, 0, sizeof(ev));
-	ev.type = down ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
-	ev.button.windowID = SDL_GetWindowID(g_window);
-	ev.button.button = SDL_BUTTON_LEFT;
-	ev.button.state = down ? SDL_PRESSED : SDL_RELEASED;
-	ev.button.clicks = 1;
-	ev.button.x = x;
-	ev.button.y = y;
-	SDL_PushEvent(&ev);
-}
-
-void pushEscape(bool down) {
-	SDL_Event ev;
-	memset(&ev, 0, sizeof(ev));
-	ev.type = down ? SDL_KEYDOWN : SDL_KEYUP;
-	ev.key.windowID = SDL_GetWindowID(g_window);
-	ev.key.state = down ? SDL_PRESSED : SDL_RELEASED;
-	ev.key.keysym.scancode = SDL_SCANCODE_ESCAPE;
-	ev.key.keysym.sym = SDLK_ESCAPE;
-	SDL_PushEvent(&ev);
 }
 
 } // End of namespace Platform

@@ -60,6 +60,13 @@ public:
 
 	static jint onLoad(JavaVM *vm);
 
+	// The activity, for the XR code
+	static jobject getXRContext();
+
+	static inline JavaVM *getJavaVM() {
+		return _vm;
+	}
+
 	static inline JNIEnv *getEnv() {
 		JNIEnv *env = (JNIEnv*) pthread_getspecific(_env_tls);
 		if (env != nullptr) {

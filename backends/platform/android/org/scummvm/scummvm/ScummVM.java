@@ -63,6 +63,11 @@ public abstract class ScummVM implements SurfaceHolder.Callback,
 	private boolean _assetsUpdated;
 	private String[] _args;
 
+	// The context the XR code binds to; the activity, overridden by the application
+	protected android.content.Context getXRContext() {
+		return null;
+	}
+
 	private native void create(AssetManager asset_manager,
 	                           EGL10 egl,
 	                           EGLDisplay egl_display,

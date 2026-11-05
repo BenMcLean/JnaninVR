@@ -19,24 +19,29 @@
  *
  */
 
-#ifndef BACKENDS_XR_OPENXR_THEATRE_H
-#define BACKENDS_XR_OPENXR_THEATRE_H
+#ifndef BACKENDS_XR_XR_H
+#define BACKENDS_XR_XR_H
 
 #include "common/scummsys.h"
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
+
+namespace Common {
+struct Event;
+}
 
 /**
- * OpenXR support for backends with an OpenGL context.
+ * Head mounted display support for backends with an OpenGL context.
  *
  * By default ("theatre mode") the ScummVM window contents are shown on a
- * floating quad, and a controller ray is turned into SDL mouse events.
+ * floating screen, and a controller ray is turned into mouse events.
  * Engines can additionally render stereo views themselves (see beginStereo()),
- * in which case the quad is replaced by the engine's views.
+ * in which case the screen is replaced by the engine's views.
  *
  * Enabled at runtime by setting the SCUMMVM_XR environment variable (SDL)
  * or the "xr" configuration key (Android).
- * The window system specific parts live in a backends/xr/openxr-platform.h implementation.
+ * The way frames reach the user is a XR::Backend (backends/xr/xr-backend.h),
+ * the application side is XR::Host (backends/xr/xr-host.h).
  */
 namespace XR {
 
@@ -75,7 +80,7 @@ void bindEye(int eye);
 /** Finish rendering an eye, and restore the previous render target. */
 void endEye(int eye);
 
-/** Submit the stereo frame to the compositor. */
+/** Submit the stereo frame to the display. */
 void endStereo();
 
 /**
@@ -87,7 +92,13 @@ float consumeTurn();
 /** Whether the inventory button was pressed since the last call. */
 bool consumeInventoryToggle();
 
-/** Stop considering the engine to be rendering stereo frames. The window is shown on the theatre quad. */
+/**
+ * Offer an application event to the XR code. Returns true if it was used up
+ * (gamepad and touch input while the active backend has no controllers).
+ */
+bool consumeEvent(const Common::Event &event);
+
+/** Stop considering the engine to be rendering stereo frames. The window is shown on the theatre screen. */
 void leaveStereo();
 
 /** Whether a headset session is running. */
@@ -110,6 +121,6 @@ bool projectAim(int eye, float &x, float &y);
 
 } // End of namespace XR
 
-#endif // USE_OPENXR
+#endif // USE_JNANINVR
 
 #endif

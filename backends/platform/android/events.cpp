@@ -40,6 +40,9 @@
 
 #include "backends/platform/android/android.h"
 #include "backends/graphics/android/android-graphics.h"
+#ifdef USE_JNANINVR
+#include "backends/xr/xr-android.h"
+#endif
 #include "backends/platform/android/jni-android.h"
 
 // floating point. use sparingly
@@ -1547,12 +1550,22 @@ bool OSystem_Android::pollEvent(Common::Event &event) {
 }
 
 void OSystem_Android::pushEvent(const Common::Event &event) {
+#ifdef USE_JNANINVR
+	if (XR::Host::filterEvent(event))
+		return;
+#endif
 	_event_queue_lock->lock();
 	_event_queue.push(event);
 	_event_queue_lock->unlock();
 }
 
 void OSystem_Android::pushEvent(const Common::Event &event1, const Common::Event &event2) {
+#ifdef USE_JNANINVR
+	if (XR::Host::filterEvent(event1)) {
+		pushEvent(event2);
+		return;
+	}
+#endif
 	_event_queue_lock->lock();
 	_event_queue.push(event1);
 	_event_queue.push(event2);

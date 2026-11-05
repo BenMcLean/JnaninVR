@@ -232,7 +232,7 @@ void Cursor::draw() {
 	_vm->_gfx->drawTexturedRect2D(screenRect, textureRect, texture, transparency);
 }
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 void Cursor::drawAt(const Common::Point &position, float scale) {
 	assert(_currentCursorID < ARRAYSIZE(availableCursors));
 
@@ -262,7 +262,7 @@ bool Cursor::isVisible() {
 }
 
 void Cursor::getDirection(float &pitch, float &heading) {
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	// The controller points freely, even when the cursor is locked at the center of the view
 	if (_vm->_scene->getXRPointerDirection(pitch, heading))
 		return;

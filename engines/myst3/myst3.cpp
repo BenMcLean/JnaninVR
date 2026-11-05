@@ -109,7 +109,7 @@ Myst3Engine::Myst3Engine(OSystem *syst, const Myst3GameDescription *version) :
 Myst3Engine::~Myst3Engine() {
 	closeArchives();
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	delete _xrBackdrop;
 #endif
 
@@ -577,7 +577,7 @@ void Myst3Engine::processInput(bool interactive) {
 		}
 	}
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	// The headset drives the camera even when the mouse doesn't move
 	if (_state->getViewType() == kCube && _scene->isXRActive()) {
 		Common::Point noMovement;
@@ -723,7 +723,7 @@ void Myst3Engine::interactWithHoveredElement() {
 		return;
 	}
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	_inventory->closeXR();
 #endif
 
@@ -820,7 +820,7 @@ void Myst3Engine::drawFrame(bool noSwap, bool pausePreloadedScriptMovies) {
 	if (cursorVisible)
 		_gfx->renderDrawable(_cursor, _scene);
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	drawXRFrame();
 #endif
 
@@ -860,7 +860,7 @@ bool Myst3Engine::isInventoryVisible() {
 void Myst3Engine::setupTransition() {
 	delete _transition;
 	_transition = new Transition(this);
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	_xrTransitionFromPanorama = _state->getViewType() == kCube;
 #endif
 }
@@ -886,7 +886,7 @@ void Myst3Engine::goToNode(uint16 nodeID, TransitionType transitionType) {
 
 	ViewType sourceViewType = _state->getViewType();
 	if (sourceViewType == kCube
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	        && !_scene->isXRActive()
 #endif
 	        ) {
@@ -959,7 +959,7 @@ void Myst3Engine::loadNode(uint16 nodeID, uint32 roomID, uint32 ageID) {
 }
 
 void Myst3Engine::unloadNode() {
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	if (_inventory)
 		_inventory->closeXR();
 #endif
@@ -983,7 +983,7 @@ void Myst3Engine::unloadNode() {
 	delete _rotationEffect;
 	_rotationEffect = nullptr;
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	if (_xrKeepBackdrop) {
 		delete _xrBackdrop;
 		_xrBackdrop = _node;
@@ -1346,7 +1346,7 @@ void Myst3Engine::playSimpleMovie(uint16 id, bool fullframe, bool refreshAmbient
 		movie.setPosU(0);
 		movie.setPosV(_state->getViewType() == kMenu ? Renderer::kTopBorderHeight : 0);
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 		if (_xrWorldMovie)
 			movie.setWorldPlacement(_xrMovieFov);
 #endif
@@ -1848,7 +1848,7 @@ void Myst3Engine::playMovieGoToNode(uint16 movie, uint16 node) {
 		node = _state->getLocationNextNode();
 	}
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	float xrStartHeading = 0.0f;
 	const bool xrMovie = beginXRMovie(true);
 	if (xrMovie && _xrWorldMovie) {
@@ -1858,7 +1858,7 @@ void Myst3Engine::playMovieGoToNode(uint16 movie, uint16 node) {
 #endif
 
 	if (_state->getViewType() == kCube && !_state->getCameraSkipAnimation()
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	        && !xrMovie
 #endif
 	        ) {
@@ -1870,7 +1870,7 @@ void Myst3Engine::playMovieGoToNode(uint16 movie, uint16 node) {
 
 	loadNode(node, room, age);
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	_xrKeepBackdrop = false;
 #endif
 
@@ -1886,7 +1886,7 @@ void Myst3Engine::playMovieGoToNode(uint16 movie, uint16 node) {
 		_state->lookAt(endPitch, endHeading);
 	}
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	if (xrMovie)
 		endXRMovie(xrStartHeading);
 #endif
@@ -1895,7 +1895,7 @@ void Myst3Engine::playMovieGoToNode(uint16 movie, uint16 node) {
 }
 
 void Myst3Engine::playMovieFullFrame(uint16 movie) {
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	float xrStartHeading = 0.0f;
 	const bool xrMovie = beginXRMovie(false);
 	if (xrMovie && _xrWorldMovie) {
@@ -1905,7 +1905,7 @@ void Myst3Engine::playMovieFullFrame(uint16 movie) {
 #endif
 
 	if (_state->getViewType() == kCube && !_state->getCameraSkipAnimation()
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	        && !xrMovie
 #endif
 	        ) {
@@ -1923,7 +1923,7 @@ void Myst3Engine::playMovieFullFrame(uint16 movie) {
 		_state->lookAt(endPitch, endHeading);
 	}
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	if (xrMovie)
 		endXRMovie(xrStartHeading);
 #endif

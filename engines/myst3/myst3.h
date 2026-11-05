@@ -175,11 +175,11 @@ public:
 	void getMovieLookAt(uint16 id, bool start, float &pitch, float &heading);
 
 	void drawFrame(bool noSwap = false, bool pausePreloadedScriptMovies = false);
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	/** Transitions to and from panoramas are not drawn in the headset, the view just cuts */
 	bool shouldSkipTransitionForXR() const;
 #endif
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	void drawXRFrame();
 	void drawStereoPanorama();
 	bool beginXRMovie(bool changesNode);
@@ -244,7 +244,7 @@ private:
 	 */
 	bool _inventoryManualHide;
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	/** Keep showing the flat window in the headset, even in a panorama node */
 	bool _xrTheater = false;
 

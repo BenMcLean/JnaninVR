@@ -31,23 +31,17 @@
 namespace XR {
 
 /**
- * What the OpenXR code needs from the host: the native window system
- * binding of the OpenGL context, and the way input reaches the engine.
+ * What the OpenXR backend needs from the host: the native window system
+ * binding of the OpenGL context.
  * One implementation is linked per backend (openxr-sdl.cpp for SDL).
  */
 namespace Platform {
-
-/** Whether the user asked for the headset to be used. */
-bool isRequested();
 
 /** Prepare the OpenXR loader, before an instance is created. */
 bool initLoader();
 
 /** Look up the native window and GL context handles. The GL context must be current. */
 bool init();
-
-/** Address of a GL function, or nullptr. */
-void *getProcAddress(const char *name);
 
 /** The OpenXR extensions needed to bind the GL context. */
 void getExtensions(Common::Array<const char *> &extensions);
@@ -57,17 +51,6 @@ const void *getInstanceNext();
 
 /** Create a session bound to the current GL context. */
 bool createSession(XrInstance instance, XrSystemId systemId, XrSession &session);
-
-/** Size of the window in input coordinates. */
-void getWindowSize(int &width, int &height);
-
-/** Size of the GL drawable in pixels. */
-void getDrawableSize(int &width, int &height);
-
-/** Input coordinates are in window coordinates. */
-void pushMouseMotion(int x, int y);
-void pushMouseButton(bool down, int x, int y);
-void pushEscape(bool down);
 
 } // End of namespace Platform
 

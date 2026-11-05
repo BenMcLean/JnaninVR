@@ -46,8 +46,8 @@ bool operator<(const TLanguage &l, const TLanguage &r) {
 	return l.name < r.name;
 }
 
-#ifdef USE_OPENXR
-// The VR builds do not ship fonts-cjk.dat, which the GUI needs for these languages
+#ifdef DISABLE_CJK_LANGUAGES
+// Builds without fonts-cjk.dat cannot display these languages in the GUI
 static bool isLanguageAvailable(const String &lang) {
 	return lang != "ja" && lang != "ko" && !lang.hasPrefix("zh");
 }

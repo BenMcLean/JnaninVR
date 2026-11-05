@@ -41,7 +41,7 @@ public:
 
 	void clear() override;
 	void selectTargetWindow(Window *window, bool is3D, bool scaled) override;
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	bool supportsXR() const override { return true; }
 #endif
 
@@ -54,7 +54,7 @@ public:
 	                                const Math::Vector3d &topRight, const Math::Vector3d &bottomRight,
 	                                Texture *texture) override;
 
-#ifdef USE_OPENXR
+#ifdef USE_JNANINVR
 	void drawTexturedRect3D(const Math::Vector3d &topLeft, const Math::Vector3d &bottomLeft,
 	                        const Math::Vector3d &topRight, const Math::Vector3d &bottomRight,
 	                        const Common::Rect &textureRect, Texture *texture) override;
