@@ -26,6 +26,7 @@
 
 #if defined(USE_CARDBOARD) && defined(ANDROID_BACKEND)
 
+#include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/system.h"
 #include "common/textconsole.h"
@@ -47,9 +48,11 @@ namespace {
 
 // How far ahead the head pose is predicted, to cover the time until the frame is on screen
 const int64 kPredictionNs = 50000000;
-// The eye images are rendered at this fraction of the half display size
-const float kEyeScale = 0.75f;
+// The eye images are rendered at this percentage of the half display size, unless "xr_eye_scale" says otherwise
+const int kDefaultEyeScale = 75;
 const uint32 kParamsRetryMs = 1000;
+// How long to wait for the scan of the viewer QR code to take over the screen
+const uint32 kScanStartMs = 5000;
 
 // OpenGL ES 2.0 shaders, the Android port creates an ES 2 context
 const char *const kVertexShader =
@@ -135,6 +138,9 @@ public:
 	bool endFrame(const Frame &frame, SubmitMode mode, const Theatre &theatre) override;
 	void present(const Theatre &theatre) override;
 	bool wantsExternalInput() const override { return true; }
+	bool isES2Only() const override { return true; }
+
+	void setPaused(bool paused) override;
 
 	bool prepareEyes() override { return _ready; }
 	void getEyeSize(int &width, int &height) const override { width = _eyeW; height = _eyeH; }
@@ -147,6 +153,11 @@ private:
 	CardboardHeadTracker *_tracker;
 	CardboardLensDistortion *_lens;
 	CardboardDistortionRenderer *_renderer;
+	// The viewer is set up by scanning its QR code: on the first run, and when the user switches viewer
+	enum ScanState { kScanNone, kScanRequested, kScanDone };
+	ScanState _scanState;
+	uint32 _scanTime;
+	bool _paused, _sawPause;
 	int _paramsChanges;
 	uint32 _lastTry;
 
@@ -172,6 +183,7 @@ private:
 };
 
 CardboardBackend::CardboardBackend() : _gl(nullptr), _tracker(nullptr), _lens(nullptr), _renderer(nullptr),
+		_scanState(kScanNone), _scanTime(0), _paused(false), _sawPause(false),
 		_paramsChanges(0), _lastTry(0), _ready(false), _dispW(0), _dispH(0), _eyeW(0), _eyeH(0),
 		_program(0), _uView(-1), _uProj(-1), _uCenter(-1), _uRight(-1), _uUp(-1), _uTex(-1),
 		_mode(kSubmitNothing) {
@@ -202,12 +214,28 @@ bool CardboardBackend::init(GLFuncs &gl) {
 }
 
 bool CardboardBackend::createParams() {
-	// The viewer scanned by the user, or else the original Cardboard
+	// The viewer scanned by the user
 	uint8_t *encoded = nullptr;
 	int size = 0;
 	CardboardQrCode_getSavedDeviceParams(&encoded, &size);
-	if (size == 0)
+	if (size == 0) {
+		CardboardQrCode_destroy(encoded);
+
+		if (_scanState == kScanNone) {
+			_scanState = kScanRequested;
+			_scanTime = g_system->getMillis(true);
+			_sawPause = false;
+			CardboardQrCode_scanQrCodeAndSaveDeviceParams();
+			return false;
+		}
+		// Wait for the scan to come back, then settle for the original Cardboard if it was skipped
+		if (_scanState == kScanRequested) {
+			if (_paused || (!_sawPause && g_system->getMillis(true) - _scanTime < kScanStartMs))
+				return false;
+			_scanState = kScanDone;
+		}
 		CardboardQrCode_getCardboardV1DeviceParams(&encoded, &size);
+	}
 	_paramsChanges = CardboardQrCode_getDeviceParamsChangedCount();
 
 	Host::getDrawableSize(_dispW, _dispH);
@@ -219,6 +247,18 @@ bool CardboardBackend::createParams() {
 	_lens = CardboardLensDistortion_create(encoded, size, _dispW, _dispH);
 	CardboardQrCode_destroy(encoded);
 	return _lens != nullptr;
+}
+
+void CardboardBackend::setPaused(bool paused) {
+	_paused = paused;
+	if (paused)
+		_sawPause = true;
+	if (!_tracker)
+		return;
+	if (paused)
+		CardboardHeadTracker_pause(_tracker);
+	else
+		CardboardHeadTracker_resume(_tracker);
 }
 
 bool CardboardBackend::createProgram() {
@@ -288,15 +328,16 @@ bool CardboardBackend::createResources() {
 		_fov[eye].tanUp = tanf(fov[3]);
 	}
 
-	_eyeW = (int)(_dispW / 2 * kEyeScale);
-	_eyeH = (int)(_dispH * kEyeScale);
+	const int scale = CLIP(ConfMan.hasKey("xr_eye_scale") ? ConfMan.getInt("xr_eye_scale") : kDefaultEyeScale, 25, 100);
+	_eyeW = _dispW / 2 * scale / 100;
+	_eyeH = _dispH * scale / 100;
 
 	{
 		GLStateSaver saver(gl);
 		gl.genTextures(2, _tex);
 		for (int eye = 0; eye < 2; eye++) {
 			gl.bindTexture(GL_TEXTURE_2D, _tex[eye]);
-			gl.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, _eyeW, _eyeH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+			gl.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA, _eyeW, _eyeH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 			gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -382,6 +423,11 @@ bool CardboardBackend::beginFrame(Frame &frame) {
 		input.stickClicked = _external->stickClicked;
 		_external->inventoryPressed = false;
 		_external->stickClicked = false;
+
+		if (_external->switchViewer) {
+			_external->switchViewer = false;
+			CardboardQrCode_scanQrCodeAndSaveDeviceParams();
+		}
 	}
 	return true;
 }

@@ -61,16 +61,34 @@ void Theatre::capture(GLFuncs &gl) {
 	GLStateSaver saver(gl);
 	if (w != _width || h != _height) {
 		gl.bindTexture(GL_TEXTURE_2D, _tex);
-		gl.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-		gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, _fbo);
-		gl.framebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _tex, 0);
+		if (gl.es2) {
+			// The window may have no alpha, and a copy cannot make up components it lacks
+			gl.texImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+		} else {
+			gl.texImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		}
+		// Without these, a texture of any size is incomplete in ES 2
+		gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		gl.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		if (!gl.es2) {
+			gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, _fbo);
+			gl.framebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _tex, 0);
+		}
 		_width = w;
 		_height = h;
 	}
 
-	gl.bindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-	gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, _fbo);
-	gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	if (gl.es2) {
+		gl.bindTexture(GL_TEXTURE_2D, _tex);
+		gl.bindFramebuffer(GL_FRAMEBUFFER, 0);
+		gl.copyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+	} else {
+		gl.bindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, _fbo);
+		gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	}
 	_valid = true;
 }
 

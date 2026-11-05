@@ -57,6 +57,9 @@
 #endif
 
 #include "backends/platform/android/android.h"
+#ifdef USE_JNANINVR
+#include "backends/xr/xr.h"
+#endif
 #include "backends/platform/android/jni-android.h"
 #include "backends/fs/android/android-fs.h"
 #include "backends/fs/android/android-fs-factory.h"
@@ -666,6 +669,9 @@ bool OSystem_Android::getFeatureState(Feature f) {
 }
 
 void OSystem_Android::setPause(bool value) {
+#ifdef USE_JNANINVR
+	XR::setPaused(value);
+#endif
 	if (g_engine) {
 		LOGD("pauseEngine: %d", value);
 

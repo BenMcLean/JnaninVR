@@ -92,6 +92,9 @@ float consumeTurn();
 /** Whether the inventory button was pressed since the last call. */
 bool consumeInventoryToggle();
 
+/** The application went to the background (true) or came back. May be called from any thread. */
+void setPaused(bool paused);
+
 /**
  * Offer an application event to the XR code. Returns true if it was used up
  * (gamepad and touch input while the active backend has no controllers).

@@ -156,6 +156,10 @@ bool handleExternalEvent(const Common::Event &event, ExternalInput &input) {
 		case Common::JOYSTICK_BUTTON_START:
 			input.menu = down;
 			return true;
+		case Common::JOYSTICK_BUTTON_BACK:
+			if (down)
+				input.switchViewer = true;
+			return true;
 		case Common::JOYSTICK_BUTTON_X:
 		case Common::JOYSTICK_BUTTON_Y:
 			if (down)

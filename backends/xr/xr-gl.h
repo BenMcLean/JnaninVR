@@ -107,17 +107,33 @@ struct GLFuncs {
 	void (XR_GL_CALL *disableVertexAttribArray)(GLuint);
 	void (XR_GL_CALL *vertexAttribPointer)(GLuint, GLint, GLenum, GLboolean, GLsizei, const void *);
 	void (XR_GL_CALL *getVertexAttribiv)(GLuint, GLenum, GLint *);
+	void (XR_GL_CALL *copyTexSubImage2D)(GLenum, GLint, GLint, GLint, GLint, GLint, GLsizei, GLsizei);
+	/** Both optional: glInvalidateFramebuffer (ES 3, GL 4.3) and glDiscardFramebufferEXT (ES 2 extension). */
+	void (XR_GL_CALL *invalidateFramebuffer)(GLenum, GLsizei, const GLenum *);
+	void (XR_GL_CALL *discardFramebufferEXT)(GLenum, GLsizei, const GLenum *);
+
+	/**
+	 * Limit to what OpenGL ES 2.0 guarantees: no separate read and draw
+	 * framebuffers, no framebuffer blits, unsized texture formats, 16 bit depth.
+	 * Set by the backend that needs it. blitFramebuffer may be nullptr.
+	 */
+	bool es2;
 };
 
-/** Load all the entry points through the host. Returns false if one is missing. */
+/** Load all the entry points through the host. Returns false if a required one is missing. */
 bool loadGLFuncs(GLFuncs &gl);
 
 /** Saves the GL state touched while copying, and restores it on scope exit. */
 class GLStateSaver {
 public:
 	GLStateSaver(GLFuncs &gl) : _gl(gl) {
-		_gl.getIntegerv(GL_READ_FRAMEBUFFER_BINDING, &_read);
-		_gl.getIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &_draw);
+		if (_gl.es2) {
+			_gl.getIntegerv(GL_FRAMEBUFFER_BINDING, &_draw);
+			_read = _draw;
+		} else {
+			_gl.getIntegerv(GL_READ_FRAMEBUFFER_BINDING, &_read);
+			_gl.getIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &_draw);
+		}
 		_gl.getIntegerv(GL_TEXTURE_BINDING_2D, &_tex);
 #ifdef GL_FRAMEBUFFER_SRGB
 		_srgb = _gl.isEnabled(GL_FRAMEBUFFER_SRGB);
@@ -130,8 +146,12 @@ public:
 			_gl.enable(GL_FRAMEBUFFER_SRGB);
 #endif
 		_gl.bindTexture(GL_TEXTURE_2D, _tex);
-		_gl.bindFramebuffer(GL_READ_FRAMEBUFFER, _read);
-		_gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, _draw);
+		if (_gl.es2) {
+			_gl.bindFramebuffer(GL_FRAMEBUFFER, _draw);
+		} else {
+			_gl.bindFramebuffer(GL_READ_FRAMEBUFFER, _read);
+			_gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, _draw);
+		}
 	}
 private:
 	GLFuncs &_gl;

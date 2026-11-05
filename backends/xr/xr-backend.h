@@ -79,6 +79,9 @@ class Backend {
 public:
 	virtual ~Backend() {}
 
+	/** Whether the GL context may be limited to OpenGL ES 2.0 (see GLFuncs::es2). */
+	virtual bool isES2Only() const { return false; }
+
 	/** Create the session. The GL functions outlive the backend. */
 	virtual bool init(GLFuncs &gl) = 0;
 	/** Release everything. Must cope with a failed init(). */
@@ -101,6 +104,9 @@ public:
 	 * Backends that draw to the window themselves do it here.
 	 */
 	virtual void present(const Theatre &theatre) { (void)theatre; }
+
+	/** The application went to the background (true) or came back. Called from any thread. */
+	virtual void setPaused(bool paused) { (void)paused; }
 
 	/** Whether the gamepad and touch events should drive this backend (see getExternalInput()). */
 	virtual bool wantsExternalInput() const { return false; }

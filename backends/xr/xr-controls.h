@@ -68,10 +68,10 @@ struct InputState {
  */
 struct ExternalInput {
 	bool select, menu;
-	bool inventoryPressed, stickClicked;
+	bool inventoryPressed, stickClicked, switchViewer;
 	float stick;
 
-	ExternalInput() : select(false), menu(false), inventoryPressed(false), stickClicked(false), stick(0.0f) {}
+	ExternalInput() : select(false), menu(false), inventoryPressed(false), stickClicked(false), switchViewer(false), stick(0.0f) {}
 };
 
 /**

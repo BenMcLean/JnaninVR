@@ -107,6 +107,7 @@ bool createBackend(Context &c) {
 			continue;
 
 		Backend *backend = cand->create();
+		c.gl.es2 = backend->isES2Only();
 		if (backend->init(c.gl)) {
 			debug(1, "XR: using the %s backend", cand->name);
 			backend->setExternalInput(&c.externalInput);
@@ -221,8 +222,15 @@ void captureBackbuffer() {
 	if (!c)
 		return;
 
-	c->theatre.capture(c->gl);
+	// Nobody sees the window while the engine's own views are shown
+	if (!stereoRecent(*c))
+		c->theatre.capture(c->gl);
 	c->backend->present(c->theatre);
+}
+
+void setPaused(bool paused) {
+	if (g_ctx && g_ctx->state == kRunning)
+		g_ctx->backend->setPaused(paused);
 }
 
 bool consumeEvent(const Common::Event &event) {

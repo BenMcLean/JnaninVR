@@ -452,6 +452,10 @@ private:
 
 bool OpenXRBackend::init(GLFuncs &gl) {
 	_c.gl = &gl;
+	if (!gl.blitFramebuffer) {
+		warning("OpenXR: needs OpenGL with framebuffer blits");
+		return false;
+	}
 	if (!Platform::initLoader() || !Platform::init()) {
 		warning("OpenXR: could not get the window");
 		return false;

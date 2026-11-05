@@ -41,11 +41,15 @@ bool loadGL(T &fn, const char *name) {
 } // End of anonymous namespace
 
 bool loadGLFuncs(GLFuncs &gl) {
+	// Only ES 3 and desktop GL have it, and an ES 2 context may still hand out the address
+	gl.blitFramebuffer = (decltype(gl.blitFramebuffer))Host::getProcAddress("glBlitFramebuffer");
+	gl.invalidateFramebuffer = (decltype(gl.invalidateFramebuffer))Host::getProcAddress("glInvalidateFramebuffer");
+	gl.discardFramebufferEXT = (decltype(gl.discardFramebufferEXT))Host::getProcAddress("glDiscardFramebufferEXT");
+
 	return loadGL(gl.genFramebuffers, "glGenFramebuffers") &&
 	       loadGL(gl.deleteFramebuffers, "glDeleteFramebuffers") &&
 	       loadGL(gl.bindFramebuffer, "glBindFramebuffer") &&
 	       loadGL(gl.framebufferTexture2D, "glFramebufferTexture2D") &&
-	       loadGL(gl.blitFramebuffer, "glBlitFramebuffer") &&
 	       loadGL(gl.genRenderbuffers, "glGenRenderbuffers") &&
 	       loadGL(gl.bindRenderbuffer, "glBindRenderbuffer") &&
 	       loadGL(gl.renderbufferStorage, "glRenderbufferStorage") &&
@@ -88,7 +92,8 @@ bool loadGLFuncs(GLFuncs &gl) {
 	       loadGL(gl.enableVertexAttribArray, "glEnableVertexAttribArray") &&
 	       loadGL(gl.disableVertexAttribArray, "glDisableVertexAttribArray") &&
 	       loadGL(gl.vertexAttribPointer, "glVertexAttribPointer") &&
-	       loadGL(gl.getVertexAttribiv, "glGetVertexAttribiv");
+	       loadGL(gl.getVertexAttribiv, "glGetVertexAttribiv") &&
+	       loadGL(gl.copyTexSubImage2D, "glCopyTexSubImage2D");
 }
 
 EyeTarget::EyeTarget() : _fbo(0), _depth(0), _width(0), _height(0), _savedFBO(0), _bound(false) {
@@ -108,7 +113,7 @@ void EyeTarget::resize(GLFuncs &gl, int width, int height) {
 		gl.deleteRenderbuffers(1, &_depth);
 	gl.genRenderbuffers(1, &_depth);
 	gl.bindRenderbuffer(GL_RENDERBUFFER, _depth);
-	gl.renderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+	gl.renderbufferStorage(GL_RENDERBUFFER, gl.es2 ? GL_DEPTH_COMPONENT16 : GL_DEPTH_COMPONENT24, width, height);
 	gl.bindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
 	gl.bindFramebuffer(GL_FRAMEBUFFER, _fbo);
 	gl.framebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _depth);
@@ -141,6 +146,13 @@ void EyeTarget::bind(GLFuncs &gl, GLuint texture) {
 void EyeTarget::unbind(GLFuncs &gl) {
 	if (!_bound)
 		return;
+
+	// The depth is of no use after the eye is drawn, so it does not have to reach memory
+	const GLenum depth = GL_DEPTH_ATTACHMENT;
+	if (gl.es2 && gl.discardFramebufferEXT)
+		gl.discardFramebufferEXT(GL_FRAMEBUFFER, 1, &depth);
+	else if (!gl.es2 && gl.invalidateFramebuffer)
+		gl.invalidateFramebuffer(GL_FRAMEBUFFER, 1, &depth);
 
 	gl.framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
 	gl.bindFramebuffer(GL_FRAMEBUFFER, _savedFBO);

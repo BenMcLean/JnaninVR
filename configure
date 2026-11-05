@@ -1297,7 +1297,7 @@ JPEG_LIBS=-ljpeg
 FLAC_LIBS=-lFLAC
 THEORADEC_LIBS=-ltheoradec
 OPENXR_LIBS=-lopenxr_loader
-CARDBOARD_LIBS=-lcardboard_api
+CARDBOARD_LIBS=-lGfxPluginCardboard
 
 for ac_option in $@; do
 	case "$ac_option" in
@@ -1583,7 +1583,7 @@ for ac_option in $@; do
 	--with-cardboard-prefix=*)
 		arg=`echo $_option | sed "s/^--with-cardboard-prefix=//"`
 		CARDBOARD_CFLAGS="-I$arg/include"
-		CARDBOARD_LIBS="-L$arg/lib -lcardboard_api"
+		CARDBOARD_LIBS="-L$arg/lib -lGfxPluginCardboard"
 		;;
 	--with-openxr-prefix=*)
 		arg=`echo $ac_option | cut -d '=' -f 2`

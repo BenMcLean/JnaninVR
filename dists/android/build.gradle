@@ -13,6 +13,9 @@ tasks.withType(JavaCompile).configureEach {
 
 //gradle.startParameter.showStacktrace = ShowStacktrace.ALWAYS_FULL
 
+// Optional Cardboard support: -PcardboardAar=/path/to/sdk-release.aar, see cardboard-sdk.sh
+def cardboardAar = findProperty('cardboardAar')
+
 android {
     namespace = "org.scummvm.scummvm"
 
@@ -26,7 +29,8 @@ android {
     defaultConfig {
         applicationId "net.benmclean.jnaninvr"
 
-        minSdkVersion 16
+        // The Cardboard SDK and its dependencies need Android 8.0
+        minSdkVersion cardboardAar ? 26 : 16
 
         // Includes the default ProGuard rules files that are packaged with
         // the Android Gradle plugin. To learn more, go to the section about
@@ -132,4 +136,14 @@ android {
 
 dependencies {
     implementation "androidx.annotation:annotation:1.10.0"
+
+    if (cardboardAar) {
+        // The SDK's own dependencies, which a local .aar does not bring along
+        implementation files(cardboardAar)
+        implementation 'androidx.appcompat:appcompat:1.6.1'
+        implementation 'com.google.android.gms:play-services-vision:20.1.3'
+        implementation 'com.google.android.material:material:1.12.0'
+        implementation 'com.google.protobuf:protobuf-javalite:3.19.4'
+        implementation 'org.jspecify:jspecify:1.0.0'
+    }
 }
