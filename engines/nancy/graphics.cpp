@@ -25,9 +25,9 @@
 
 #include "engines/nancy/nancy.h"
 #include "engines/nancy/graphics.h"
-#include "engines/nancy/iff.h"
+#include "engines/nancy/resource/iff.h"
 #include "engines/nancy/renderobject.h"
-#include "engines/nancy/resource.h"
+#include "engines/nancy/resource/resource.h"
 #include "engines/nancy/cursor.h"
 #include "engines/nancy/state/scene.h"
 
@@ -128,11 +128,11 @@ void GraphicsManager::init() {
 	_screen.clear();
 
 	// Nancy16 runs at a higher resolution than the game was made for. The
-	// viewport's chunk holds the resolution the game gets drawn at.
-	if (g_nancy->getGameType() >= kGameTypeNancy16) {
-		auto *viewportData = GetEngineData(VIEW);
-		assert(viewportData);
-
+	// viewport's chunk holds the resolution the game gets drawn at, which is
+	// the one of the screen from Nancy24 on.
+	const VIEW *viewportData = GetEngineData(VIEW);
+	if (g_nancy->getGameType() >= kGameTypeNancy16 && viewportData &&
+			(viewportData->bounds.width() != _screen.w || viewportData->bounds.height() != _screen.h)) {
 		_gameSurface.create(viewportData->bounds.width(), viewportData->bounds.height(), getScreenPixelFormat());
 		_gameSurface.setTransparentColor(getTransColor());
 		_gameSurface.clear();
@@ -449,6 +449,24 @@ void GraphicsManager::loadSystemFonts(const IFF &fontIFF) {
 	}
 }
 
+// The font file of the game folder a face is in, if any. The face in the one
+// file Nancy23 has, "Digital Display2.ttf", is named after the file.
+static Common::Path findCustomFontFile(const ScriptBootData &boot, const Common::String &faceName) {
+	for (const Common::String &fileName : boot.customFontFiles) {
+		Common::String baseName = fileName;
+		const size_t dot = baseName.findLastOf('.');
+		if (dot != Common::String::npos) {
+			baseName.erase(dot);
+		}
+
+		if (baseName.equalsIgnoreCase(faceName)) {
+			return Common::Path(fileName);
+		}
+	}
+
+	return Common::Path();
+}
+
 void GraphicsManager::loadSystemFonts(const ScriptBootData &boot) {
 	const int32 kNormalWeight = 400;
 	const int32 kBoldWeight = 700;
@@ -462,13 +480,15 @@ void GraphicsManager::loadSystemFonts(const ScriptBootData &boot) {
 			_fonts.resize(font.id + 1);
 		}
 
-		_fonts[font.id].setSystemFont(font.name, font.faceName, font.height, font.isBold ? kBoldWeight : kNormalWeight);
+		_fonts[font.id].setSystemFont(font.name, font.faceName, font.height, font.isBold ? kBoldWeight : kNormalWeight,
+			findCustomFontFile(boot, font.faceName));
 	}
 
 	// Every font also comes in bold, after the ones with a number of their own
 	for (const ScriptBootData::SystemFont &font : boot.fonts) {
 		_fonts.resize(_fonts.size() + 1);
-		_fonts.back().setSystemFont(font.name + "_Bold", font.faceName, font.height, kBoldWeight);
+		_fonts.back().setSystemFont(font.name + "_Bold", font.faceName, font.height, kBoldWeight,
+			findCustomFontFile(boot, font.faceName));
 	}
 
 	for (const ScriptBootData::FontColor &color : boot.fontColors) {
@@ -546,6 +566,16 @@ void GraphicsManager::removeObject(RenderObject *object) {
 			break;
 		}
 	}
+}
+
+bool GraphicsManager::hasObject(const RenderObject *object) const {
+	for (const RenderObject *r : _objects) {
+		if (r == object) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void GraphicsManager::clearObjects() {

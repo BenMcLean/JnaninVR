@@ -80,6 +80,15 @@ void Record::storeValue(const char *name) {
 	lua_pop(L, 1);
 }
 
+void Record::clean() {
+	lua_State *L = getLua();
+	lua_pushlightuserdata(L, this);
+	lua_pushnil(L);
+	lua_rawset(L, LUA_REGISTRYINDEX);
+
+	_hasActiveFunction = false;
+}
+
 void Record::create(int tableIndex) {
 	lua_State *L = getLua();
 
@@ -166,7 +175,7 @@ void Record::update(double sceneTime, double elapsedTime) {
 
 	_wasActive = _isActive;
 
-	if (!_isActive) {
+	if (!_isActive || isPaused()) {
 		return;
 	}
 
@@ -261,6 +270,12 @@ bool Record::reset() {
 	return true;
 }
 
+bool Record::restart() {
+	_isActive = true;
+	_hasActiveFunction = false;
+	return reset();
+}
+
 bool Record::callFunction(const char *name, int numArgs, int numResults) {
 	lua_State *L = getLua();
 
@@ -279,6 +294,28 @@ bool Record::callFunction(const char *name, int numArgs, int numResults) {
 
 	const Common::String what = Common::String::format("Error running override '%s'", name);
 	return LuaState::call(L, numArgs + 1, numResults, what.c_str());
+}
+
+// The functions scripts can give a record for what the player does
+static const char *const kEventFunctionNames[kNumRecordEvents] = {
+	"OnLeftClick", "OnRightClick", "OnLeftDown", "OnLeftUp", "OnRightDown", "OnRightUp",
+	"OnKeyDown", "OnKey", "OnKeyUp"
+};
+
+// The functions for what the player does, which scripts can give a record as
+// well. The Nancy23 and Nancy24 exes only have the ones of the scripts.
+static bool isEventFunctionName(const Common::String &key) {
+	if (key == "OnMouseMove" || key == "ChangeCursor") {
+		return true;
+	}
+
+	for (const char *name : kEventFunctionNames) {
+		if (key == name) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 int Record::getScriptField() {
@@ -300,6 +337,17 @@ int Record::getScriptField() {
 	} else if (key == "transform" && hasTransform()) {
 		pushMatrix(L, _transform);
 		return 1;
+	}
+
+	// A function the script stored under this name is used instead of the
+	// built-in one, e.g. Nancy24's buttons call OnMouseMove without a point
+	if (isEventFunctionName(key)) {
+		pushStoredValue(key.c_str());
+		if (lua_isfunction(L, -1)) {
+			return 1;
+		}
+
+		lua_pop(L, 1);
 	}
 
 	// The functions every record has
@@ -351,12 +399,6 @@ int Record::setScriptField() {
 
 	return 0;
 }
-
-// The functions scripts can give a record for what the player does
-static const char *const kEventFunctionNames[kNumRecordEvents] = {
-	"OnLeftClick", "OnRightClick", "OnLeftDown", "OnLeftUp", "OnRightDown", "OnRightUp",
-	"OnKeyDown", "OnKey", "OnKeyUp"
-};
 
 void Record::sendMouseMove(const ScriptPoint &point, bool inViewport) {
 	if (!isActive()) {
@@ -595,6 +637,21 @@ static int recordReset(lua_State *L) {
 	return 0;
 }
 
+// ar:Restart(), Nancy22
+static int recordRestart(lua_State *L) {
+	if (!checkRecord(L, 1)->restart()) {
+		return luaL_error(L, "Cannot reset AR");
+	}
+
+	return 0;
+}
+
+// ar:Clean(), Nancy24
+static int recordClean(lua_State *L) {
+	checkRecord(L, 1)->clean();
+	return 0;
+}
+
 // ar:Render()
 static int recordRender(lua_State *L) {
 	checkRecord(L, 1)->render();
@@ -687,6 +744,8 @@ static const luaL_Reg kRecordFunctions[] = {
 	{ "__newindex", recordNewIndex },
 	{ "__eq", recordEquals },
 	{ "Reset", recordReset },
+	{ "Restart", recordRestart },
+	{ "Clean", recordClean },
 	{ "Run", recordRun },
 	{ "Render", recordRender },
 	{ "OnMouseMove", recordOnMouseMove },
@@ -726,6 +785,13 @@ static int createRecord(lua_State *L) {
 	return 1;
 }
 
+// AR:GetActualField(ar, name), Nancy24: what a script stored in the record,
+// such as its "active" function rather than whether it is active
+static int recordGetActualField(lua_State *L) {
+	checkRecord(L, 2)->pushStoredValue(luaL_checkstring(L, 3));
+	return 1;
+}
+
 void registerRecordAPI(lua_State *L) {
 	for (uint i = 0; i < kNumRecordKinds; ++i) {
 		const char *typeName = getRecordTypeName((RecordKind)i);
@@ -750,6 +816,7 @@ void registerRecordAPI(lua_State *L) {
 
 	static const luaL_Reg kFactoryFunctions[] = {
 		{ "__index", indexFunctions },
+		{ "GetActualField", recordGetActualField },
 		{ nullptr, nullptr }
 	};
 

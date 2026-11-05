@@ -83,6 +83,17 @@ bool getFlagByName(const Common::String &name, bool &value);
 // into the UI, once it has been made
 void showPlayerEntries();
 
+class SceneContext;
+
+// Nancy24: whether a task of the character being played is done, as its
+// completion function in the scripts says. A task without a completion
+// function is always done.
+bool isTaskComplete(const Common::String &text);
+
+// Drops the completion functions of tasks a scene gave, as the scene is
+// going away
+void forgetTaskCompletions(SceneContext *context);
+
 // Reads a cursor a script picked with "Cursor.<name>", "Cursor.<name>.hot"...
 // Returns false when the value is something else.
 bool testCursor(lua_State *L, int index, uint &cursorType, bool &isHot);
@@ -109,6 +120,10 @@ void registerRefAPI(lua_State *L);
 // Sound channels, as picked with "SoundChannel.<name>"
 void pushSoundChannel(lua_State *L, uint16 channel);
 uint16 checkSoundChannel(lua_State *L, int index);
+
+// Whether a channel is one of those speech plays on, and whether any of them plays
+bool isVoiceChannel(uint16 channel);
+bool isVoicePlaying();
 
 } // End of namespace Script
 } // End of namespace Nancy

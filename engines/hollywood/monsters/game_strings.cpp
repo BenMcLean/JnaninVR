@@ -22,6 +22,7 @@
 #include "common/config-manager.h"
 
 #include "hollywood/monsters/game_strings.h"
+#include "hollywood/text_translation.h"
 
 namespace Hollywood {
 
@@ -52,6 +53,7 @@ const HollywoodGameStrings kSpanishGameStrings = {
 	"\xa8" "Est\xa0s seguro?",
 	"S",
 	"N",
+	"Cambiar idioma",
 
 	" pasadizo",
 	" ata\xa3" "d ancho",
@@ -90,6 +92,7 @@ const HollywoodGameStrings kItalianGameStrings = {
 	"Sei sicuro?",
 	"S",
 	"N",
+	"Cambia lingua",
 
 	" passaggio",
 	" cassa da morto larga", // WORKAROUND: The Italian executable leaves this variant in Spanish.
@@ -128,6 +131,7 @@ const HollywoodGameStrings kEnglishGameStrings = {
 	"Are you sure?",
 	"Y",
 	"N",
+	"Change language",
 
 	" passage",
 	" wide coffin",
@@ -139,8 +143,54 @@ const HollywoodGameStrings kEnglishGameStrings = {
 		"Crack", "Hut", "Stairs", "Waterfall", "Elevator" }
 };
 
-const HollywoodGameStrings &getGameStrings(Common::Language language) {
-	if (ConfMan.hasKey("language")) {
+void HollywoodGameStrings::applyTranslation(const TextTranslation &translation) {
+	for (uint i = 0; i < kGameActionCaptionCount; ++i) {
+		actionCaptions[i] = translation.interfaceText(Common::String::format("action%u", i), actionCaptions[i]);
+		panelVerbLabels[i] = translation.interfaceText(Common::String::format("verb%u", i), panelVerbLabels[i]);
+	}
+	struct {
+		const char *key;
+		const char **value;
+	} fields[] = {
+		{ "relationTo", &relationTo },
+		{ "relationWith", &relationWith },
+		{ "inventoryCaption", &inventoryCaption },
+		{ "optionsSave", &optionsSave },
+		{ "optionsLoad", &optionsLoad },
+		{ "optionsQuit", &optionsQuit },
+		{ "optionsPlay", &optionsPlay },
+		{ "optionsMusicOn", &optionsMusicOn },
+		{ "optionsMusicOff", &optionsMusicOff },
+		{ "optionsSfxOn", &optionsSfxOn },
+		{ "optionsSfxOff", &optionsSfxOff },
+		{ "optionsTestOn", &optionsTestOn },
+		{ "optionsTestOff", &optionsTestOff },
+		{ "optionsMusicVolume", &optionsMusicVolume },
+		{ "optionsSfxVolume", &optionsSfxVolume },
+		{ "optionsVoiceVolume", &optionsVoiceVolume },
+		{ "optionsTextSpeed", &optionsTextSpeed },
+		{ "optionsText", &optionsText },
+		{ "optionsVoice", &optionsVoice },
+		{ "optionsBoth", &optionsBoth },
+		{ "optionsQuitPrompt", &optionsQuitPrompt },
+		{ "optionsQuitYes", &optionsQuitYes },
+		{ "optionsQuitNo", &optionsQuitNo },
+		{ "optionsChangeLanguage", &optionsChangeLanguage },
+		{ "passageName", &passageName },
+		{ "wideCoffinName", &wideCoffinName },
+		{ "recordsName", &recordsName },
+		{ "changeDrink", &changeDrink },
+		{ "openTap", &openTap },
+		{ "stopMakingCocktails", &stopMakingCocktails }
+	};
+	for (uint i = 0; i < ARRAYSIZE(fields); ++i)
+		*fields[i].value = translation.interfaceText(fields[i].key, *fields[i].value);
+	for (uint i = 0; i < ARRAYSIZE(mineDestinationLabels); ++i)
+		mineDestinationLabels[i] = translation.interfaceText(Common::String::format("mineDestination%u", i), mineDestinationLabels[i]);
+}
+
+const HollywoodGameStrings &getGameStrings(Common::Language language, bool useConfiguredLanguage) {
+	if (useConfiguredLanguage && ConfMan.hasKey("language")) {
 		const Common::Language selectedLanguage = Common::parseLanguage(ConfMan.get("language"));
 		if (selectedLanguage == Common::EN_ANY || selectedLanguage == Common::EN_GRB ||
 				selectedLanguage == Common::EN_USA)

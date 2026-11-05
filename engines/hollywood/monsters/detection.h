@@ -28,6 +28,12 @@
 
 namespace Hollywood {
 
+#ifdef USE_TRANSLATION
+const uint32 kMonstersTranslationFlags = ADGF_ADDENGLISH;
+#else
+const uint32 kMonstersTranslationFlags = 0;
+#endif
+
 extern const ADFileBasedFallback monstersFileBasedFallback[];
 const ADGameDescription *detectMonstersVariant(const AdvancedMetaEngineBase::FileMap &allFiles);
 

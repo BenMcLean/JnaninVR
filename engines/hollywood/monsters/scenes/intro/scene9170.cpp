@@ -85,7 +85,7 @@ Scene9170::Scene9170(HollywoodEngine *vm) :
 		_ambientSpeech(vm->getLanguage()),
 		_sound(),
 		_ambientSound(),
-		_text(),
+		_text(vm->textTranslation()),
 		_random("hollywood_scene9170"),
 		_paletteResource(),
 		_baseFramebuffer(),
@@ -481,8 +481,9 @@ void Scene9170::advanceLowerRoomAmbience() {
 
 	_effectFrame = (_effectFrame + 1) % ARRAYSIZE(kScene9170EffectFrameMap);
 	_effectDirty = true;
-	if (_ambientSpeechSampleId != 0 && !_ambientSpeech.isPlaying())
-		_ambientSpeech.playSample(_ambientSpeechSampleId, 50);
+	if (_ambientSpeechSampleId != 0 && !_ambientSpeech.isPlaying() &&
+			!_ambientSpeech.playSample(_ambientSpeechSampleId, 50))
+		_ambientSpeechSampleId = 0;
 	if (!_ambientSound.isPlaying())
 		_ambientSound.playSample(0x1b, 100);
 }

@@ -29,6 +29,10 @@
 
 #include "engines/nancy/state/scene.h"
 
+#ifdef ENABLE_NANCY_V4
+#include "engines/nancy/script/api.h"
+#endif
+
 #include "engines/nancy/ui/ndui/manager.h"
 #include "engines/nancy/ui/ndui/panel.h"
 #include "engines/nancy/ui/ndui/button.h"
@@ -37,9 +41,10 @@ namespace Nancy {
 namespace UI {
 namespace NDUI {
 
-// The Nancy19 channels the UI plays a sound on for the player to hear a new volume with
-static const uint16 kSampleChannelMusic = 4;
-static const uint16 kSampleChannelFX = 22;
+// The channels the UI plays a sound on for the player to hear a new volume with:
+// UIMusic, UIFX and UIVoice, which Nancy22 numbers differently
+static uint16 getSampleChannelMusic() { return g_nancy->getGameType() >= kGameTypeNancy22 ? 1 : 4; }
+static uint16 getSampleChannelFX() { return g_nancy->getGameType() >= kGameTypeNancy22 ? 24 : 22; }
 static const uint16 kSampleChannelVoice = 28;
 
 // The timer whose displays show the time of day
@@ -141,9 +146,9 @@ void Manager::takeEngineAction(const Action &action) {
 	} else if (action.target.equalsIgnoreCase("Engine_VoiceVolume")) {
 		onVolumeAction(action, "speech_volume", kSampleChannelVoice);
 	} else if (action.target.equalsIgnoreCase("Engine_FXVolume")) {
-		onVolumeAction(action, "sfx_volume", kSampleChannelFX);
+		onVolumeAction(action, "sfx_volume", getSampleChannelFX());
 	} else if (action.target.equalsIgnoreCase("Engine_MusicVolume")) {
-		onVolumeAction(action, "music_volume", kSampleChannelMusic);
+		onVolumeAction(action, "music_volume", getSampleChannelMusic());
 	} else if (action.target.equalsIgnoreCase("Engine_Flags")) {
 		onFlagsAction(action);
 	} else if (action.target.equalsIgnoreCase("Engine_Sound")) {
@@ -497,7 +502,12 @@ void Manager::onTasklistAction(const Action &action) {
 	}
 
 	int16 flag = _tasklistFlags.getValOrDefault(action.sender, kEvNoEvent);
-	if (flag != kEvNoEvent && NancySceneState.getEventFlag(flag, g_nancy->_false)) {
+	bool isDone = flag == kEvNoEvent || !NancySceneState.getEventFlag(flag, g_nancy->_false);
+#ifdef ENABLE_NANCY_V4
+	isDone = isDone && Script::isTaskComplete(action.sender);
+#endif
+
+	if (!isDone) {
 		takeAction(kActionSetValue, action.sender, 0.0);
 	} else {
 		TasklistData *tasklistData = (TasklistData *)NancySceneState.getPuzzleData(TasklistData::getTag());

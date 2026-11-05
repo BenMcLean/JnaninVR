@@ -41,6 +41,7 @@ class SeekableReadStream;
 
 namespace Nancy {
 
+struct ENVS;
 struct NancyInput;
 
 namespace UI {
@@ -107,6 +108,9 @@ public:
 
 	// Nancy20: lets the records of the scene know that it is being left
 	void endScene();
+
+	// Puts the background and what the records draw back on the screen
+	void registerGraphics();
 
 	// Loads the scene the stream was asked to go to, without running it.
 	// Returns whether there was one, and it could be loaded.
@@ -181,9 +185,19 @@ public:
 	// instead of with the next frame
 	void loadNow(const Common::String &name);
 
+	void registerGraphics();
+
 	void changeScene(const Common::String &name, const SceneChangeDescription &sceneDescription);
 	void changeScene(const Common::String &name, const Common::String &sceneName, uint16 frameID);
 	Common::String getSceneName(const Common::String &name) const;
+
+	// Nancy23: how long the scene the stream is in has been running, or -1 when
+	// there is none
+	double getSceneTime(const Common::String &name) const;
+
+	// Nancy24: the frame of the scene the stream is in, or -1 when there is none
+	int getSceneFrame(const Common::String &name) const;
+
 	bool isRunning(const Common::String &name) const { return find(name) != nullptr; }
 
 	// The stream whose records are running or getting input; null for the main one
@@ -208,6 +222,7 @@ public:
 
 	static const char *getMainStreamName();
 	static const char *getUIStreamName();
+	static const char *getManagerStreamName();	// Nancy22
 
 	// Nancy19: hands a message to the scenes of the streams it is for. Returns
 	// false when there is none.
@@ -230,9 +245,12 @@ public:
 	// What a stream gets drawn with; null when there is no such stream
 	const ViewTransform *getViewTransform(const Common::String &name);
 
-	// Nancy21: where a stream is among the others. Every stream is a step closer
-	// than the one that began it, and the main stream is at 0.
+	// Nancy21: where a stream is among the others. The main stream is at 0.
 	double getZ(const Common::String &name) const;
+
+	// The z of the frontmost stream, and of the one that is running
+	int32 getFrontZOffset() const;
+	int32 getRunningZOffset() const { return _running ? _running->getZOffset() : 0; }
 
 	// Keeps the streams in the saved game, and starts them again after loading
 	void store();
@@ -240,6 +258,7 @@ public:
 
 private:
 	void endChildren(const Common::Array<SceneStream::Child> &children);
+	void changeEnvironmentStream(const ENVS &envs, const Common::String &newEnvironment);
 
 	// Every stream in the order they run and get input in. The main stream is
 	// the scene itself, and takes part as a null entry.
@@ -249,6 +268,8 @@ private:
 	Common::String _environment;
 
 #ifdef ENABLE_NANCY_V4
+	const Script::SceneContext *findScriptScene(const Common::String &name) const;
+
 	Script::ScriptMatrix _mainStreamTransform;
 #endif
 	ViewTransform _mainStreamViewTransform;

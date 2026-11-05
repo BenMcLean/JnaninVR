@@ -20,9 +20,9 @@
  */
 
 #include "engines/nancy/nancy.h"
-#include "engines/nancy/iff.h"
+#include "engines/nancy/resource/iff.h"
 #include "engines/nancy/input.h"
-#include "engines/nancy/resource.h"
+#include "engines/nancy/resource/resource.h"
 #include "engines/nancy/sound.h"
 #include "engines/nancy/util.h"
 
@@ -296,6 +296,18 @@ bool SceneStream::loadScene() {
 	return true;
 }
 
+void SceneStream::registerGraphics() {
+	if (_background) {
+		_background->registerGraphics();
+	}
+
+#ifdef ENABLE_NANCY_V4
+	if (_scriptScene) {
+		_scriptScene->registerGraphics();
+	}
+#endif
+}
+
 void SceneStream::endScene() {
 #ifdef ENABLE_NANCY_V4
 	if (_scriptScene) {
@@ -329,12 +341,21 @@ void SceneStream::clearScene() {
 static const char *const kMainStreamName = "MainStream";
 static const char *const kUIStreamName = "UIStream";
 
+// Nancy22: the stream with the scripts of the environments, and the one with the
+// managers, which the scripts of every scene call on
+static const char *const kEnvStreamName = "EnvStream";
+static const char *const kManagerStreamName = "ManagerStream";
+
 const char *SceneStreamManager::getMainStreamName() {
 	return kMainStreamName;
 }
 
 const char *SceneStreamManager::getUIStreamName() {
 	return kUIStreamName;
+}
+
+const char *SceneStreamManager::getManagerStreamName() {
+	return kManagerStreamName;
 }
 
 #ifdef ENABLE_NANCY_V4
@@ -418,6 +439,17 @@ double SceneStreamManager::getZ(const Common::String &name) const {
 	return stream ? stream->getZOffset() : 0.0;
 }
 
+int32 SceneStreamManager::getFrontZOffset() const {
+	int32 front = 0;
+	for (const SceneStream *stream : _streams) {
+		if (stream && !stream->isEnded()) {
+			front = MAX(front, stream->getZOffset());
+		}
+	}
+
+	return front;
+}
+
 void SceneStreamManager::getStreamNames(Common::Array<Common::String> &names, bool withUI) const {
 	if (withUI && find(kUIStreamName)) {
 		names.push_back(kUIStreamName);
@@ -466,6 +498,14 @@ void SceneStreamManager::begin(const Common::String &name, const Common::String 
 		_running->_children.push_back(child);
 	} else {
 		_mainStreamChildren.push_back(child);
+	}
+}
+
+void SceneStreamManager::registerGraphics() {
+	for (SceneStream *stream : _streams) {
+		if (stream) {
+			stream->registerGraphics();
+		}
 	}
 }
 
@@ -540,6 +580,39 @@ Common::String SceneStreamManager::getSceneName(const Common::String &name) cons
 
 	const SceneStream *stream = name.empty() ? _running : find(name);
 	return stream ? stream->getSceneName() : Common::String();
+}
+
+#ifdef ENABLE_NANCY_V4
+const Script::SceneContext *SceneStreamManager::findScriptScene(const Common::String &name) const {
+	if (name.equalsIgnoreCase(kMainStreamName)) {
+		return NancySceneState.getScriptScene();
+	}
+
+	const SceneStream *stream = name.empty() ? _running : find(name);
+	return stream ? stream->getScriptScene() : nullptr;
+}
+#endif
+
+double SceneStreamManager::getSceneTime(const Common::String &name) const {
+#ifdef ENABLE_NANCY_V4
+	const Script::SceneContext *scene = findScriptScene(name);
+	if (scene) {
+		return scene->getTime();
+	}
+#endif
+
+	return -1.0;
+}
+
+int SceneStreamManager::getSceneFrame(const Common::String &name) const {
+#ifdef ENABLE_NANCY_V4
+	const Script::SceneContext *scene = findScriptScene(name);
+	if (scene) {
+		return scene->getFrame();
+	}
+#endif
+
+	return -1;
 }
 
 // Nancy17 takes an item out of the inventory while its scene is up, in a stream
@@ -668,6 +741,11 @@ void SceneStreamManager::changeEnvironment(const Common::String &newEnvironment)
 		return;
 	}
 
+	if (g_nancy->getGameType() >= kGameTypeNancy22) {
+		changeEnvironmentStream(*envs, newEnvironment);
+		return;
+	}
+
 	for (const ENVS::Environment &env : envs->environments) {
 		if (env.code.equalsIgnoreCase(_environment)) {
 			end(env.code + "_Enter_Stream");
@@ -688,6 +766,28 @@ void SceneStreamManager::changeEnvironment(const Common::String &newEnvironment)
 			flags.runsFirst = true;
 			begin(env.code + "_Enter_Stream", env.ambientScriptName.toString(), 0, flags);
 		}
+	}
+}
+
+// Nancy22 runs the script of every environment in the same stream, which moves
+// on to the script of the next environment, and ends in one without a script
+void SceneStreamManager::changeEnvironmentStream(const ENVS &envs, const Common::String &newEnvironment) {
+	_environment = newEnvironment;
+
+	Common::String sceneName;
+	for (const ENVS::Environment &env : envs.environments) {
+		if (env.code.equalsIgnoreCase(newEnvironment)) {
+			sceneName = env.ambientScriptName.toString();
+			break;
+		}
+	}
+
+	if (sceneName.empty()) {
+		end(kEnvStreamName);
+	} else if (find(kEnvStreamName)) {
+		changeScene(kEnvStreamName, sceneName, 0);
+	} else {
+		begin(kEnvStreamName, sceneName, 0, StreamFlags());
 	}
 }
 

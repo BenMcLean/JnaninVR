@@ -22,7 +22,7 @@
 
 #include "engines/nancy/nancy.h"
 #include "engines/nancy/graphics.h"
-#include "engines/nancy/resource.h"
+#include "engines/nancy/resource/resource.h"
 #include "engines/nancy/font.h"
 
 #include "engines/nancy/misc/hypertext.h"
@@ -321,7 +321,7 @@ void HypertextParser::drawAllText(const Common::Rect &textBounds, uint leftOffse
 		// Do word wrapping on the text, sans tokens. This assumes
 		// all text uses fonts of the same width
 		Array<Common::String> wrappedLines;
-		int maxWidth = textBounds.width();
+		int maxWidth = _wrapsLines ? textBounds.width() : _fullSurface.w;
 		if (hasMark) {
 			auto *mark = GetEngineData(MARK);
 			assert(mark);
@@ -524,7 +524,7 @@ void HypertextParser::drawAllText(const Common::Rect &textBounds, uint leftOffse
 				// Draw the normal text
 				const int drawX = textBounds.left + horizontalOffset + (newLineStart ? 0 : leftOffsetNonNewline);
 				const int drawY = textBounds.top + _numDrawnLines * lineStep(font) + _imageVerticalOffset;
-				drawTextRun(_fullSurface, font, stringToDraw, drawX, drawY, textBounds.width(), colorID);
+				drawTextRun(_fullSurface, font, stringToDraw, drawX, drawY, _wrapsLines ? textBounds.width() : _fullSurface.w - drawX, colorID);
 
 				// Underline the segment (the <u> markup toggle) in the text color.
 				if (underline && !stringToDraw.empty()) {

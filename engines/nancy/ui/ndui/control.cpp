@@ -53,13 +53,14 @@ void Control::read(Common::SeekableReadStream &stream) {
 	if (g_nancy->getGameType() >= kGameTypeNancy17) {
 		readFilename(stream, _tooltip);
 
-		// The texts are the keys of autotext entries, when there are any by their name
+		// Texts and tooltips are autotext keys when an autotext entry by that name
+		// exists. Nancy25 has an entry for the empty key, which is never shown.
 		const CVTX *autotext = (const CVTX *)g_nancy->getEngineData("AUTOTEXT");
-		if (autotext && autotext->texts.contains(_text)) {
+		if (autotext && !_text.empty() && autotext->texts.contains(_text)) {
 			_text = autotext->texts[_text];
 		}
 
-		if (autotext && autotext->texts.contains(_tooltip)) {
+		if (autotext && !_tooltip.empty() && autotext->texts.contains(_tooltip)) {
 			_tooltip = autotext->texts[_tooltip];
 		}
 	}
@@ -103,11 +104,45 @@ bool Control::doAction(const Action &action) {
 	case kActionToggleEnabled:
 		setEnabled(!_enabled);
 		break;
+	case kActionBeginFlash:
+		if (_numFlashes <= 0) {
+			_isFlashOn = true;
+		}
+
+		// Without a number of flashes, it flashes until told to stop
+		_numFlashes = action.value > 0 ? (int)action.value : INT_MAX;
+		break;
+	case kActionEndFlash:
+		_numFlashes = 0;
+		break;
 	default:
 		return false;
 	}
 
 	return true;
+}
+
+void Control::updateFlash() {
+	if (_numFlashes <= 0) {
+		return;
+	}
+
+	if (_isFlashOn) {
+		if (_elements[0].hasReached(kStateMouseOver)) {
+			_isFlashOn = false;
+		}
+	} else if (_elements[0].hasReached(kStateDisabled)) {
+		--_numFlashes;
+		_isFlashOn = true;
+	}
+}
+
+ControlState Control::getFlashState() const {
+	if (_numFlashes <= 0) {
+		return kStateNormal;
+	}
+
+	return _isFlashOn ? kStateMouseOver : kStateDisabled;
 }
 
 void Control::setVisible(bool visible) {

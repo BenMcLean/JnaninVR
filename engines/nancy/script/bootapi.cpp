@@ -220,8 +220,12 @@ static int envCreate(lua_State *L) {
 			luaL_error(L, "Environments must specify the 'fullName' field");
 		}
 
+		// Nancy22 calls the script of the environment its "sceneName"
 		Common::String name;
-		readField(L, env, "onEnterScene", name);
+		if (!readField(L, env, "onEnterScene", name)) {
+			readField(L, env, "sceneName", name);
+		}
+
 		environment.ambientScriptName = Common::Path(name);
 
 		name.clear();
@@ -279,6 +283,29 @@ static int flagsCreate(lua_State *L) {
 
 	readStringList(L, 2, flags.eventFlagNames);
 	flags.numRecords = flags.eventFlagNames.size();
+	return 0;
+}
+
+// VarTableInit and StrTableInit, Nancy1New: the names of the values and the
+// texts the scripts keep
+
+static void readNames(lua_State *L, ScriptBootData::NameSet &names) {
+	Common::Array<Common::String> list;
+	readStringList(L, 2, list);
+	for (const Common::String &name : list) {
+		names.setVal(name, true);
+	}
+}
+
+static int varTableCreate(lua_State *L) {
+	checkCreateArguments(L, "ND.VarTableInit", s_tables && s_tables->boot);
+	readNames(L, s_tables->boot->valueNames);
+	return 0;
+}
+
+static int strTableCreate(lua_State *L) {
+	checkCreateArguments(L, "ND.StrTableInit", s_tables && s_tables->boot);
+	readNames(L, s_tables->boot->textNames);
 	return 0;
 }
 
@@ -494,6 +521,27 @@ static int fontsCreate(lua_State *L) {
 	return 0;
 }
 
+// FontsInit:CustomFonts({ file, ... }), Nancy23, which makes the fonts in the
+// files known before the fonts get made
+static int fontsCustomFonts(lua_State *L) {
+	checkUserData(L, 1, "ND.FontsInit");
+	if (!lua_istable(L, 2)) {
+		luaL_argerror(L, 2, "Expected parameter to be a table");
+	}
+
+	if (!s_tables || !s_tables->boot) {
+		luaL_error(L, "ND.FontsInit cannot be used by this script");
+	}
+
+	lua_pushnil(L);
+	while (lua_next(L, 2)) {
+		s_tables->boot->customFontFiles.push_back(luaL_checkstring(L, -1));
+		lua_pop(L, 1);
+	}
+
+	return 0;
+}
+
 static uint32 readColorField(lua_State *L, int tableIndex, const char *name) {
 	uint32 color = 0;
 	if (pushField(L, tableIndex, name)) {
@@ -561,8 +609,9 @@ static const InitObject kInitObjects[] = {
 	{ "LoadSaveInit", "ND.LoadSaveInit", loadSaveCreate },
 	{ "ViewportInit", "ND.ViewportInit", viewportCreate },
 	{ "FlagsInit", "ND.FlagsInit", flagsCreate },
+	{ "VarTableInit", "ND.VarTableInit", varTableCreate },
+	{ "StrTableInit", "ND.StrTableInit", strTableCreate },
 	{ "InventoryInit", "ND.InventoryInit", inventoryCreate },
-	{ "FontsInit", "ND.FontsInit", fontsCreate },
 	{ "ColorsInit", "ND.ColorsInit", colorsCreate },
 	{ "AutotextInit", "ND.AutotextInit", autotextCreate }
 };
@@ -605,6 +654,15 @@ void registerBootAPI(lua_State *L) {
 	};
 
 	registerGlobal(L, "CursorInit", "ND.CursorInit", kCursorInitFunctions);
+
+	static const luaL_Reg kFontsInitFunctions[] = {
+		{ "__index", indexFunctions },
+		{ "Create", fontsCreate },
+		{ "CustomFonts", fontsCustomFonts },
+		{ nullptr, nullptr }
+	};
+
+	registerGlobal(L, "FontsInit", "ND.FontsInit", kFontsInitFunctions);
 }
 
 } // End of namespace Script

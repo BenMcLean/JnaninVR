@@ -19,8 +19,13 @@
  *
  */
 
+#include "common/array.h"
+#include "common/hash-str.h"
+#include "common/hashmap.h"
 #include "common/scummsys.h"
 #include "common/util.h"
+
+#include "engines/nancy/nancy.h"
 
 #include "engines/nancy/script/luabind.h"
 #include "engines/nancy/script/mathtypes.h"
@@ -249,19 +254,27 @@ static int vectorNewIndex(lua_State *L) {
 	return 0;
 }
 
+// Nancy19 only works on two vectors of the same size. From Nancy20 on, the
+// result has the size of the larger one, and what the smaller one lacks is 0.
 static void checkSameSize(lua_State *L, const ScriptVector &a, const ScriptVector &b) {
-	if (a.size != b.size) {
+	if (a.size != b.size && g_nancy->getGameType() < kGameTypeNancy20) {
 		luaL_error(L, "Vector 1 has %d dimensions but vector 2 has %d dimensions", a.size, b.size);
 	}
 }
 
-static int vectorAdd(lua_State *L) {
-	ScriptVector result = checkVector(L, 1);
-	const ScriptVector &other = checkVector(L, 2);
-	checkSameSize(L, result, other);
+static double getComponent(const ScriptVector &vector, int index) {
+	return index < vector.size ? vector.v[index] : 0.0;
+}
 
+static int vectorAdd(lua_State *L) {
+	const ScriptVector &left = checkVector(L, 1);
+	const ScriptVector &right = checkVector(L, 2);
+	checkSameSize(L, left, right);
+
+	ScriptVector result;
+	result.size = MAX(left.size, right.size);
 	for (int i = 0; i < result.size; ++i) {
-		result.v[i] += other.v[i];
+		result.v[i] = getComponent(left, i) + getComponent(right, i);
 	}
 
 	pushVector(L, result);
@@ -269,12 +282,14 @@ static int vectorAdd(lua_State *L) {
 }
 
 static int vectorSubtract(lua_State *L) {
-	ScriptVector result = checkVector(L, 1);
-	const ScriptVector &other = checkVector(L, 2);
-	checkSameSize(L, result, other);
+	const ScriptVector &left = checkVector(L, 1);
+	const ScriptVector &right = checkVector(L, 2);
+	checkSameSize(L, left, right);
 
+	ScriptVector result;
+	result.size = MAX(left.size, right.size);
 	for (int i = 0; i < result.size; ++i) {
-		result.v[i] -= other.v[i];
+		result.v[i] = getComponent(left, i) - getComponent(right, i);
 	}
 
 	pushVector(L, result);
@@ -289,9 +304,9 @@ static int vectorMultiply(lua_State *L) {
 	ScriptVector result;
 	if (left && right) {
 		checkSameSize(L, *left, *right);
-		result = *left;
+		result.size = MAX(left->size, right->size);
 		for (int i = 0; i < result.size; ++i) {
-			result.v[i] *= right->v[i];
+			result.v[i] = getComponent(*left, i) * getComponent(*right, i);
 		}
 	} else {
 		result = left ? *left : checkVector(L, 2);
@@ -315,8 +330,10 @@ static int vectorDivide(lua_State *L) {
 
 	if (right) {
 		checkSameSize(L, result, *right);
+		const ScriptVector left = result;
+		result.size = MAX(left.size, right->size);
 		for (int i = 0; i < result.size; ++i) {
-			result.v[i] /= right->v[i];
+			result.v[i] = getComponent(left, i) / getComponent(*right, i);
 		}
 	} else {
 		const double divisor = luaL_checknumber(L, 2);
@@ -345,8 +362,8 @@ static int vectorDot(lua_State *L) {
 	checkSameSize(L, a, b);
 
 	double sum = 0.0;
-	for (int i = 0; i < a.size; ++i) {
-		sum += a.v[i] * b.v[i];
+	for (int i = 0; i < MAX(a.size, b.size); ++i) {
+		sum += getComponent(a, i) * getComponent(b, i);
 	}
 
 	lua_pushnumber(L, sum);
@@ -388,8 +405,10 @@ static int vectorLerp(lua_State *L) {
 	const double amount = luaL_checknumber(L, 3);
 	checkSameSize(L, result, other);
 
+	const ScriptVector from = result;
+	result.size = MAX(from.size, other.size);
 	for (int i = 0; i < result.size; ++i) {
-		result.v[i] += (other.v[i] - result.v[i]) * amount;
+		result.v[i] = getComponent(from, i) + (getComponent(other, i) - getComponent(from, i)) * amount;
 	}
 
 	pushVector(L, result);
@@ -448,10 +467,22 @@ static int pushTransformedVector(lua_State *L, const ScriptVector &vector, const
 	return 1;
 }
 
-// vector:Transform(kind, matrix)
+// vector:Transform(kind, matrix). Nancy22 moves any vector by its x, y and z,
+// with no z for a 2D one, and gives a 3D vector back.
 static int vectorTransform(lua_State *L) {
 	const ScriptVector &vector = checkVector(L, 1);
 	const char *kind = luaL_checkstring(L, 2);
+
+	if (g_nancy->getGameType() >= kGameTypeNancy22) {
+		ScriptVector place = vector;
+		if (place.size < 3) {
+			place.v[2] = 0.0;
+		}
+
+		place.size = 3;
+		return pushTransformedVector(L, place, checkMatrix(L, 3), kind);
+	}
+
 	return pushTransformedVector(L, vector, checkMatrix(L, 3), kind);
 }
 
@@ -869,10 +900,310 @@ static const luaL_Reg kQuaternionHelperFunctions[] = {
 	{ nullptr, nullptr }
 };
 
-// rect:Transform(matrix)
-static int rectTransform(lua_State *L) {
-	pushRect(L, transformRect(checkRect(L, 1), checkMatrix(L, 2)));
+// Path, Nancy20: places to be at certain times. The scripts of Nancy22 use it
+// for the car of the driving game that plays back a recorded drive, and Nancy23
+// for the dot that moves along the metro map.
+// Path:New{ { x, y, time }, ... } takes them in the order of their times.
+// From Nancy24 on, a path holds waypoints instead: named numbers at a time,
+// which Nancy25 moves the car on its map with.
+// TODO: The curves through the places that path:GetPosition(time, false) gives,
+// and RemovePoint, GetGuides and SetGuides, which no script uses
+static const char *const kPathType = "ND.Path";
+static const char *const kPathHelperType = "ND.PathHelper";
+
+typedef Common::HashMap<Common::String, double> PathFields;
+
+struct PathPoint {
+	double time = 0.0;
+	PathFields fields;
+
+	double get(const char *name) const {
+		return fields.getValOrDefault(name, 0.0);
+	}
+};
+
+typedef Common::Array<PathPoint> PathPoints;
+
+// A path object holds the places, which go away with it
+static PathPoints *&getPathPoints(lua_State *L, int index) {
+	return *(PathPoints **)checkUserData(L, index, kPathType);
+}
+
+static PathPoints &checkPath(lua_State *L, int index) {
+	return *getPathPoints(L, index);
+}
+
+static int pathNew(lua_State *L) {
+	luaL_checktype(L, 2, LUA_TTABLE);
+	const uint32 numPoints = (uint32)lua_objlen(L, 2);
+
+	PathPoints &points = **pushValue(L, kPathType, new PathPoints());
+	points.resize(numPoints);
+	for (uint32 i = 0; i < numPoints; ++i) {
+		lua_rawgeti(L, 2, i + 1);
+		lua_getfield(L, -1, "x");
+		lua_getfield(L, -2, "y");
+		lua_getfield(L, -3, "time");
+		points[i].fields["x"] = luaL_checknumber(L, -3);
+		points[i].fields["y"] = luaL_checknumber(L, -2);
+		points[i].time = luaL_checknumber(L, -1);
+		lua_pop(L, 4);
+	}
+
 	return 1;
+}
+
+static int pathCollect(lua_State *L) {
+	PathPoints *&points = getPathPoints(L, 1);
+	delete points;
+	points = nullptr;
+	return 0;
+}
+
+// path.count, Nancy24: how many waypoints there are; path.time: the time of the
+// last one, or 0 when there is none
+static int pathIndex(lua_State *L) {
+	const PathPoints &points = checkPath(L, 1);
+	const Common::String key = luaL_checkstring(L, 2);
+
+	if (key == "count") {
+		lua_pushinteger(L, points.size());
+		return 1;
+	}
+
+	if (key == "time") {
+		lua_pushnumber(L, points.empty() ? 0.0 : points.back().time);
+		return 1;
+	}
+
+	return indexFunctions(L);
+}
+
+// path:AddPoint({ x, y, time }) or path:AddPoint(x, y, time), Nancy20, which
+// puts the place after the ones up to its time
+static int pathAddPoint(lua_State *L) {
+	PathPoints &points = checkPath(L, 1);
+
+	PathPoint point;
+	double x = 0.0;
+	double y = 0.0;
+	if (lua_istable(L, 2)) {
+		readField(L, 2, "x", x);
+		readField(L, 2, "y", y);
+		readField(L, 2, "time", point.time);
+	} else {
+		x = luaL_checknumber(L, 2);
+		y = luaL_checknumber(L, 3);
+		point.time = luaL_checknumber(L, 4);
+	}
+
+	point.fields["x"] = x;
+	point.fields["y"] = y;
+
+	uint index = 0;
+	while (index < points.size() && points[index].time <= point.time) {
+		++index;
+	}
+
+	points.insert_at(index, point);
+	return 0;
+}
+
+// path:AddWaypoint({ time = t, name = number, ... }), Nancy24: inserts the
+// waypoint in time order, ahead of any waypoints with the same time. Like the
+// original, it removes "time" from the table.
+static int pathAddWaypoint(lua_State *L) {
+	PathPoints &points = checkPath(L, 1);
+	if (!lua_istable(L, 2)) {
+		return luaL_error(L, "AddWaypoint must be fed a table as its sole parameter");
+	}
+
+	PathPoint point;
+	if (!readField(L, 2, "time", point.time)) {
+		return luaL_error(L, "AddWaypoint must be fed a table with a 'time' field");
+	}
+
+	lua_pushnil(L);
+	lua_setfield(L, 2, "time");
+
+	lua_pushnil(L);
+	while (lua_next(L, 2)) {
+		if (lua_type(L, -2) != LUA_TSTRING) {
+			return luaL_error(L, "AddWaypoint only takes named numbers");
+		}
+
+		point.fields[lua_tostring(L, -2)] = luaL_checknumber(L, -1);
+		lua_pop(L, 1);
+	}
+
+	uint index = 0;
+	while (index < points.size() && points[index].time < point.time) {
+		++index;
+	}
+
+	points.insert_at(index, point);
+	return 0;
+}
+
+// path:GetInterpolants(time[, loops]), Nancy24: returns a table of the named
+// numbers at the given time, linearly interpolated between the waypoints on
+// either side of it. A number that only one of the two waypoints has is taken
+// from that waypoint. Before the first waypoint and after the last one, their
+// numbers are returned as is, unless the path loops, in which case it starts
+// over after its last waypoint.
+static int pathGetInterpolants(lua_State *L) {
+	const PathPoints &points = checkPath(L, 1);
+	double time = luaL_checknumber(L, 2);
+	const bool loops = lua_toboolean(L, 3) != 0;
+
+	PathFields result;
+	if (points.size() == 1) {
+		result = points[0].fields;
+	} else if (points.size() > 1) {
+		const double lastTime = points.back().time;
+		if (loops && lastTime > 0.0 && (time >= lastTime || time < 0.0)) {
+			time -= floor(time / lastTime) * lastTime;
+		}
+
+		// The first waypoint after the time
+		uint next = 0;
+		while (next < points.size() && points[next].time <= time) {
+			++next;
+		}
+
+		if (next == 0 || next == points.size()) {
+			result = points[next == 0 ? 0 : next - 1].fields;
+		} else {
+			const PathPoint &from = points[next - 1];
+			const PathPoint &to = points[next];
+			const double progress = (time - from.time) / (to.time - from.time);
+
+			for (const auto &field : from.fields) {
+				PathFields::const_iterator other = to.fields.find(field._key);
+				if (other == to.fields.end()) {
+					result[field._key] = field._value;
+				} else {
+					result[field._key] = field._value + (other->_value - field._value) * progress;
+				}
+			}
+
+			for (const auto &field : to.fields) {
+				if (!result.contains(field._key)) {
+					result[field._key] = field._value;
+				}
+			}
+		}
+	}
+
+	lua_createtable(L, 0, result.size());
+	for (const auto &field : result) {
+		lua_pushnumber(L, field._value);
+		lua_setfield(L, -2, field._key.c_str());
+	}
+
+	return 1;
+}
+
+// path:GetPosition(time[, straight[, loops]]): where the path is at a time, in a
+// straight line between the places around it. A path that loops starts over
+// after its last place; one that doesn't stays at its ends.
+static int pathGetPosition(lua_State *L) {
+	const PathPoints &points = checkPath(L, 1);
+	const uint32 numPoints = points.size();
+	double time = luaL_checknumber(L, 2);
+	const bool loops = lua_isboolean(L, 4) && lua_toboolean(L, 4);
+
+	if (numPoints == 0) {
+		return luaL_error(L, "Path is empty");
+	}
+
+	ScriptVector position;
+	position.size = 2;
+
+	const double lastTime = points[numPoints - 1].time;
+	const PathPoint *at = nullptr;
+	if (numPoints == 1) {
+		at = &points[0];
+	} else if ((time > lastTime || time < 0.0) && (!loops || lastTime == 0.0)) {
+		at = time > lastTime ? &points[numPoints - 1] : &points[0];
+	} else if (time > lastTime || time < 0.0) {
+		time -= floor(time / lastTime) * lastTime;
+	}
+
+	if (at) {
+		position.v[0] = at->get("x");
+		position.v[1] = at->get("y");
+		pushVector(L, position);
+		return 1;
+	}
+
+	uint32 next = 1;
+	while (next + 1 < numPoints && time > points[next].time) {
+		++next;
+	}
+
+	const PathPoint &from = points[next - 1];
+	const PathPoint &to = points[next];
+	const double span = to.time - from.time;
+	const double progress = span != 0.0 ? (time - from.time) / span : 0.0;
+
+	position.v[0] = from.get("x") + (to.get("x") - from.get("x")) * progress;
+	position.v[1] = from.get("y") + (to.get("y") - from.get("y")) * progress;
+	pushVector(L, position);
+	return 1;
+}
+
+static const luaL_Reg kPathFunctions[] = {
+	{ "__index", pathIndex },
+	{ "__gc", pathCollect },
+	{ "GetPosition", pathGetPosition },
+	{ "AddPoint", pathAddPoint },
+	{ "AddWaypoint", pathAddWaypoint },
+	{ "GetInterpolants", pathGetInterpolants },
+	{ nullptr, nullptr }
+};
+
+static const luaL_Reg kPathHelperFunctions[] = {
+	{ "__index", indexFunctions },
+	{ "New", pathNew },
+	{ nullptr, nullptr }
+};
+
+// rect:Transform(matrix). Nancy22 moves all four corners, and gives the
+// smallest and the largest of them as two vectors.
+static int rectTransform(lua_State *L) {
+	const ScriptRect &rect = checkRect(L, 1);
+	const ScriptMatrix &matrix = checkMatrix(L, 2);
+
+	if (g_nancy->getGameType() < kGameTypeNancy22) {
+		pushRect(L, transformRect(rect, matrix));
+		return 1;
+	}
+
+	const double corners[4][2] = {
+		{ (double)rect.left, (double)rect.top }, { (double)rect.right, (double)rect.top },
+		{ (double)rect.left, (double)rect.bottom }, { (double)rect.right, (double)rect.bottom }
+	};
+
+	ScriptVector minimum(1e300, 1e300, 1e300);
+	ScriptVector maximum(-1e300, -1e300, -1e300);
+	for (const double *corner : corners) {
+		// D3DXVec3TransformCoord, of a point at no depth
+		double point[4];
+		for (int i = 0; i < 4; ++i) {
+			point[i] = corner[0] * matrix.m[0][i] + corner[1] * matrix.m[1][i] + matrix.m[3][i];
+		}
+
+		for (int i = 0; i < 3; ++i) {
+			const double value = point[3] != 0.0 ? point[i] / point[3] : point[i];
+			minimum.v[i] = MIN(minimum.v[i], value);
+			maximum.v[i] = MAX(maximum.v[i], value);
+		}
+	}
+
+	pushVector(L, minimum);
+	pushVector(L, maximum);
+	return 2;
 }
 
 void registerMathTypes(lua_State *L) {
@@ -884,6 +1215,9 @@ void registerMathTypes(lua_State *L) {
 
 	registerType(L, kQuaternionType, kQuaternionFunctions);
 	registerGlobal(L, "Quaternion", kQuaternionHelperType, kQuaternionHelperFunctions);
+
+	registerType(L, kPathType, kPathFunctions);
+	registerGlobal(L, "Path", kPathHelperType, kPathHelperFunctions);
 
 	// Rectangles can be moved by a matrix as well
 	luaL_getmetatable(L, "ND.Rect");

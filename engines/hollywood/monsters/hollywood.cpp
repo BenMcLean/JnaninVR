@@ -23,6 +23,7 @@
 #include "common/archive.h"
 #include "common/config-manager.h"
 #include "common/debug.h"
+#include "common/file.h"
 #include "common/random.h"
 #include "engines/advancedDetector.h"
 #include "engines/util.h"
@@ -33,6 +34,7 @@
 #include "hollywood/monsters/console.h"
 #include "hollywood/debug.h"
 #include "hollywood/monsters/font.h"
+#include "hollywood/monsters/gameplay/game_loop.h"
 #include "hollywood/monsters/gameplay/travel_screen.h"
 #include "hollywood/resource.h"
 #include "hollywood/monsters/scenes/intro/demo_montage.h"
@@ -148,6 +150,7 @@ int optionsLevelToConfigTalkSpeed(byte level) {
 HollywoodEngine::HollywoodEngine(OSystem *syst, const ADGameDescription *gameDesc) :
 		Engine(syst),
 		_gameDescription(gameDesc),
+		_gameStrings(getGameStrings(gameDesc->language)),
 		_font(new HollywoodFont()),
 		_introMusic(),
 		_gameplayMusic(),
@@ -157,7 +160,8 @@ HollywoodEngine::HollywoodEngine(OSystem *syst, const ADGameDescription *gameDes
 		_sceneRestartRequested(false),
 		_debugSceneSolveRequest(0),
 		_scene7100RescueFailureVariant(false),
-		_canSave(false) {
+		_canSave(false),
+		_hotspotScene(nullptr) {
 }
 
 HollywoodEngine::~HollywoodEngine() {
@@ -214,6 +218,20 @@ bool HollywoodEngine::consumeDebugSceneSolveRequest(uint16 sceneNumber) {
 
 Common::Error HollywoodEngine::run() {
 	setDebugger(new Console(this));
+
+#ifdef USE_TRANSLATION
+	if (!isDemo() && (getLanguage() == Common::ES_ESP || getLanguage() == Common::UNK_LANG) &&
+			Common::File::exists("hollywood.dat") && _translation.load("hollywood.dat", "RESOURCE.003")) {
+		const Common::Language language = ConfMan.hasKey("language") ?
+			Common::parseLanguage(ConfMan.get("language")) : Common::UNK_LANG;
+		if (language != Common::UNK_LANG && language != Common::ES_ESP) {
+			const char *code = (language == Common::EN_GRB || language == Common::EN_USA) ?
+				"en" : Common::getLanguageCode(language);
+			if (!setSubtitleLanguage(code))
+				warning("No Hollywood Monsters translation for %s", code);
+		}
+	}
+#endif
 
 	const Graphics::PixelFormat screenFormat = Graphics::PixelFormat::createFormatCLUT8();
 	initGraphics(kScreenWidth, kScreenHeight, &screenFormat);
@@ -374,6 +392,21 @@ bool HollywoodEngine::hasFeature(EngineFeature f) const {
 		f == kSupportsSavingDuringRuntime;
 }
 
+void HollywoodEngine::drawSceneHotspots(const GameplayLoopDelegate *scene) {
+	if (!_showHotspots)
+		return;
+
+	_hotspotScene = scene;
+	drawHotspots();
+	_hotspotScene = nullptr;
+}
+
+void HollywoodEngine::getHotspotPositions(Common::Array<Graphics::HotspotInfo> &hotspots) {
+	if (_hotspotScene && !_hotspotScene->shouldExitGameplayLoop())
+		_hotspotScene->hotspots().getHotspotPositions(hotspots, _hotspotScene->savedFramebuffer(),
+			_hotspotScene->viewportXOffset(), _hotspotScene->viewportYOffset());
+}
+
 void HollywoodEngine::syncSoundSettings() {
 	Engine::syncSoundSettings();
 
@@ -423,6 +456,41 @@ const char *HollywoodEngine::getGameId() const {
 
 Common::Language HollywoodEngine::getLanguage() const {
 	return _gameDescription->language;
+}
+
+bool HollywoodEngine::setSubtitleLanguage(const Common::String &language) {
+	if (!_translation.setLanguage(language))
+		return false;
+	_gameStrings = getGameStrings(language.empty() ? getLanguage() : Common::EN_ANY, false);
+	_gameStrings.applyTranslation(_translation);
+	return true;
+}
+
+uint HollywoodEngine::nextSubtitleLanguageIndex() const {
+	const Common::Array<TextTranslation::Language> &languages = _translation.languages();
+	for (uint i = 0; i < languages.size(); ++i) {
+		if (languages[i].code == _translation.language())
+			return i + 1;
+	}
+	return 0;
+}
+
+void HollywoodEngine::cycleSubtitleLanguage() {
+	const Common::Array<TextTranslation::Language> &languages = _translation.languages();
+	if (languages.empty())
+		return;
+	const uint next = nextSubtitleLanguageIndex();
+	const Common::String language = next < languages.size() ? languages[next].code : Common::String();
+	if (setSubtitleLanguage(language)) {
+		ConfMan.set("language", language.empty() ? "es" : language);
+		ConfMan.flushToDisk();
+	}
+}
+
+Common::String HollywoodEngine::nextSubtitleLanguageName() const {
+	const Common::Array<TextTranslation::Language> &languages = _translation.languages();
+	const uint next = nextSubtitleLanguageIndex();
+	return next < languages.size() ? languages[next].name : "Espa\xa4ol";
 }
 
 Common::Platform HollywoodEngine::getPlatform() const {

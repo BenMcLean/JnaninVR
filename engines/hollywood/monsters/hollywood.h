@@ -29,7 +29,9 @@
 
 #include "hollywood/monsters/gameplay/cursor.h"
 #include "hollywood/monsters/gameplay/game_state.h"
+#include "hollywood/monsters/game_strings.h"
 #include "hollywood/monsters/music.h"
+#include "hollywood/text_translation.h"
 
 struct ADGameDescription;
 
@@ -39,6 +41,7 @@ class Serializer;
 
 namespace Hollywood {
 
+class GameplayLoopDelegate;
 class HollywoodFont;
 
 class HollywoodEngine : public Engine {
@@ -63,6 +66,11 @@ public:
 	bool isDemo() const;
 	bool isFirstEdition() const;
 	bool hasSpeechData() const;
+	const TextTranslation *textTranslation() const { return &_translation; }
+	const HollywoodGameStrings &gameStrings() const { return _gameStrings; }
+	bool setSubtitleLanguage(const Common::String &language);
+	void cycleSubtitleLanguage();
+	Common::String nextSubtitleLanguageName() const;
 
 	HollywoodFont *font() const { return _font; }
 	HollywoodCursor *cursor() { return &_cursor; }
@@ -85,6 +93,7 @@ public:
 	}
 	bool canSave() const { return _canSave; }
 	void setCanSave(bool canSave) { _canSave = canSave; }
+	void drawSceneHotspots(const GameplayLoopDelegate *scene = nullptr);
 
 	enum {
 		kScreenWidth = 640,
@@ -94,11 +103,19 @@ public:
 		kSceneItemCount = 21
 	};
 
+protected:
+	void getHotspotPositions(Common::Array<Graphics::HotspotInfo> &hotspots) override;
+	Graphics::HotspotRenderer *createHotspotRenderer() override;
+	bool hideCursorForHotspots() const override { return false; }
+
 private:
+	uint nextSubtitleLanguageIndex() const;
 	Common::Error syncGameStream(Common::Serializer &s);
 	void normalizeLoadedGameState();
 
 	const ADGameDescription *_gameDescription;
+	TextTranslation _translation;
+	HollywoodGameStrings _gameStrings;
 	HollywoodFont *_font;
 	HollywoodCursor _cursor;
 	MusicPlayer _introMusic;
@@ -110,6 +127,7 @@ private:
 	uint16 _debugSceneSolveRequest;
 	bool _scene7100RescueFailureVariant;
 	bool _canSave;
+	const GameplayLoopDelegate *_hotspotScene;
 };
 
 } // End of namespace Hollywood

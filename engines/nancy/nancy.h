@@ -23,6 +23,7 @@
 #define NANCY_H
 
 #include "common/file.h"
+#include "common/hashmap.h"
 #include "common/str.h"
 #include "common/ptr.h"
 
@@ -82,8 +83,6 @@ namespace Nancy {
 //       protagonists each carry their own cell phone
 static const int kSavegameVersion = 12;
 
-struct NancyGameDescription;
-
 class ResourceManager;
 class IFF;
 class InputManager;
@@ -98,12 +97,16 @@ namespace State {
 class State;
 }
 
+namespace Script {
+class OverrideRecord;
+}
+
 class NancyEngine : public Engine {
 public:
-	NancyEngine(OSystem *syst, const NancyGameDescription *gd);
+	NancyEngine(GameType type, OSystem *syst, const ADGameDescription *gd);
 	~NancyEngine();
 
-	static NancyEngine *create(GameType type, OSystem *syst, const NancyGameDescription *gd);
+	static NancyEngine *create(GameType type, OSystem *syst, const ADGameDescription *gd);
 
 	void errorString(const char *buf_input, char *buf_output, int buf_output_size) override;
 	bool hasFeature(EngineFeature f) const override;
@@ -175,6 +178,17 @@ public:
 	// Used to check whether we need to show the SaveDialog
 	bool _hasJustSaved;
 
+	// Nancy22: the records that took a name with SetMessagingName. Each name
+	// goes to one record at a time; records without one go by the
+	// "messagingName" a script stored in them.
+	typedef Common::HashMap<Common::String, Script::OverrideRecord *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> MessagingNameMap;
+	MessagingNameMap _messagingNames;
+
+	// Nancy21: what the scripts keep apart from the saved games, packed the way
+	// Save:Data packs it. The original writes it to a file of its own; here it
+	// lasts for as long as the game runs.
+	Common::HashMap<Common::String, Common::Array<byte> > _scriptAttic;
+
 protected:
 	Common::Error run() override;
 	void pauseEngineIntern(bool pause) override;
@@ -218,7 +232,8 @@ private:
 	GameFlow _gameFlow;
 	OSystem *_system;
 
-	const NancyGameDescription *_gameDescription;
+	const ADGameDescription *_gameDescription;
+	const GameType _gameType;
 
 	Common::Array<Common::WeakPtr<DeferredLoader>> _deferredLoaderObjects;
 };

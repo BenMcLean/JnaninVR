@@ -41,6 +41,11 @@ class CMap;
 struct Light;
 struct SetShadow;
 
+// Default sound parameters of a room in the original
+static const float kSoundDefaultMaxDist = 8.0f;
+static const float kSoundDefaultPanFactor = 1.5f;
+static const float kSoundDefaultRadius = 0.8f;
+
 class Set : public PoolObject<Set> {
 public:
 	Set(const Common::String &name, Common::SeekableReadStream *data);
@@ -69,10 +74,15 @@ public:
 	void setupLights(const Math::Vector3d &pos, bool inOverworld);
 
 	void setSoundPosition(const char *soundName, const Math::Vector3d &pos);
-	void setSoundPosition(const char *soundName, const Math::Vector3d &pos, int minVol, int maxVol);
-	void calculateSoundPosition(const Math::Vector3d &pos, int minVol, int maxVol, int &volume, int &balance);
-	void setSoundParameters(int minVolume, int maxVolume);
-	void getSoundParameters(int *minVolume, int *maxVolume);
+	void setSoundPosition(const char *soundName, const Math::Vector3d &pos, int minVol, int maxVol, float maxDist, float radius);
+	void setSoundPosition(int soundId, const Math::Vector3d &pos, int minVol, int maxVol, float maxDist, float radius);
+	void relocateSounds();
+	bool calculateSoundPosition(const Math::Vector3d &pos, int minVol, int maxVol, float maxDist, float radius, int &volume, int &balance);
+
+	// Without arguments the sound parameters go back to the defaults of a room
+	void setSoundParameters(float maxDist = kSoundDefaultMaxDist, int minVolume = 20, int maxVolume = 127,
+							float panFactor = kSoundDefaultPanFactor, float maxRadius = kSoundDefaultRadius);
+	void getSoundParameters(float *maxDist, int *minVolume, int *maxVolume, float *panFactor, float *maxRadius);
 
 	const Common::String &getName() const { return _name; }
 
@@ -171,6 +181,26 @@ private:
 	Setup *_currSetup;
 	typedef Common::List<ObjectState::Ptr> StateList;
 	StateList _states;
+
+	// A sound with a position in the set, which has to be updated when the camera changes
+	struct SoundPosition {
+		Common::String name;	// Empty if the sound is identified by a number
+		int soundId;
+		Math::Vector3d pos;
+		int minVol, maxVol;
+		float maxDist;
+		float radius;
+	};
+	Common::List<SoundPosition> _soundPositions;
+	float _soundMaxDist;
+	float _soundPanFactor;
+	float _soundMaxRadius;
+
+	const char *getSoundKey(const SoundPosition &sound) const;
+	bool isSoundPlaying(const SoundPosition &sound) const;
+	void addSoundPosition(const SoundPosition &newSound);
+	void updateSoundPosition(const SoundPosition &sound);
+	void removeStoppedSounds();
 
 	Math::Frustum _frustum;
 

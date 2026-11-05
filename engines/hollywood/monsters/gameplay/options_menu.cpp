@@ -95,6 +95,10 @@ const int kOptionsToggleSquareX[2] = { 0x13a, 0x236 };
 const int kOptionsToggleSquareY[4] = { 0x75, 0xc8, 0x11b, 0x16e };
 const int kOptionsToggleSquareSize = 0x10;
 const uint kOptionsMaximumLevel = 200;
+const int kOptionsLanguageButtonLeft = 0x1d2;
+const int kOptionsLanguageButtonRight = 0x22d;
+const int kOptionsLanguageButtonTop = 0x13a;
+const int kOptionsLanguageButtonBottom = 0x155;
 
 GameplayOptionsMenu::GameplayOptionsMenu(HollywoodEngine *vm) :
 		_vm(vm),
@@ -276,9 +280,8 @@ void GameplayOptionsMenu::pollEvents(bool &done) {
 		switch (event.type) {
 		case Common::EVENT_QUIT:
 		case Common::EVENT_RETURN_TO_LAUNCHER:
-			Engine::quitGame();
 			done = true;
-			break;
+			return;
 		case Common::EVENT_MOUSEMOVE:
 			_vm->cursor()->updatePosition(event.mouse);
 			break;
@@ -438,6 +441,9 @@ void GameplayOptionsMenu::handleLeftClick(uint16 cursorX, uint16 cursorY, bool &
 		syncSettings = true;
 		refreshTestAudio = true;
 		break;
+	case kHitLanguage:
+		_vm->cycleSubtitleLanguage();
+		break;
 	case kHitConfirmQuit:
 		disableTestAudio();
 		Engine::quitGame();
@@ -475,6 +481,10 @@ GameplayOptionsMenu::HitAction GameplayOptionsMenu::hitActionAt(uint16 cursorX, 
 		return kHitQuit;
 	if (pointInGlobalRect(cursorX, cursorY, 0x200, 0x0f1, 0x25c, 0x10c))
 		return kHitPlay;
+	if (!_vm->textTranslation()->languages().empty() &&
+			pointInGlobalRect(cursorX, cursorY, kOptionsLanguageButtonLeft, kOptionsLanguageButtonTop,
+				kOptionsLanguageButtonRight, kOptionsLanguageButtonBottom))
+		return kHitLanguage;
 
 	if (pointInGlobalRect(cursorX, cursorY, 0x28b, 0x020, 0x312, 0x033))
 		return kHitMusicToggle;
@@ -808,12 +818,22 @@ void GameplayOptionsMenu::drawGameplayPreview() {
 
 void GameplayOptionsMenu::drawControls(Graphics::Surface &surface) {
 	GameplayState &state = _vm->gameState();
-	const HollywoodGameStrings &strings = getGameStrings(_vm->getLanguage());
+	const HollywoodGameStrings &strings = _vm->gameStrings();
 
 	drawText(surface, strings.optionsSave, 0x1d1, 0xd7, kOptionsTextActiveColor, true);
 	drawText(surface, strings.optionsLoad, 0x22e, 0xd7, kOptionsTextActiveColor, true);
 	drawText(surface, strings.optionsQuit, 0x1d1, 0xf4, kOptionsTextActiveColor, true);
 	drawText(surface, strings.optionsPlay, 0x22e, 0xf4, kOptionsTextActiveColor, true);
+	if (!_vm->textTranslation()->languages().empty()) {
+		_screen.copyRectToSurface(_menuFramebuffer.surface(), kOptionsLanguageButtonLeft - kOptionsViewportXOffset,
+			kOptionsLanguageButtonTop, Common::Rect(kOptionsQuitMainButtonLeft, kOptionsQuitMainButtonTop,
+				kOptionsQuitMainButtonRight, kOptionsQuitMainButtonBottom));
+		const int center = (kOptionsLanguageButtonLeft + kOptionsLanguageButtonRight) / 2;
+		drawText(surface, strings.optionsChangeLanguage, center, kOptionsLanguageButtonTop - 28,
+			kOptionsTextActiveColor, true);
+		drawText(surface, _vm->nextSubtitleLanguageName(), center, kOptionsLanguageButtonTop + 3,
+			kOptionsTextActiveColor, true);
+	}
 
 	drawText(surface, state.musicEnabled ? strings.optionsMusicOn : strings.optionsMusicOff, 0x2a3, 0x20,
 		state.musicEnabled ? kOptionsTextActiveColor : kOptionsTextDisabledColor, false);
@@ -867,7 +887,7 @@ void GameplayOptionsMenu::drawControls(Graphics::Surface &surface) {
 }
 
 void GameplayOptionsMenu::drawQuitConfirmation(Graphics::Surface &surface) {
-	const HollywoodGameStrings &strings = getGameStrings(_vm->getLanguage());
+	const HollywoodGameStrings &strings = _vm->gameStrings();
 	drawText(surface, strings.optionsQuitPrompt, 0x1ff, 0x168, kOptionsTextActiveColor, true);
 	drawQuitConfirmationBacking();
 	drawText(surface, strings.optionsQuitYes, 0x1f1, 0x18c, kOptionsTextActiveColor, true);

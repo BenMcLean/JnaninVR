@@ -133,6 +133,9 @@ Scene8010::Scene8010(HollywoodEngine *vm) :
 		_fishermanChannel(),
 		_fishermanSpeechIdleChannel(),
 		_secondaryAmbientChannel(),
+		_fishermanQuizEntries(),
+		_fishermanQuizFinalEntry(),
+		_fishermanQuizChoiceEntryIndex(),
 		_fishermanState(0),
 		_fishermanRepeatCount(0),
 		_previousSecondaryAmbientCue(0),
@@ -841,7 +844,7 @@ bool Scene8010::runFishermanGeneratedPrimarySpeechLine(byte promptLineIndex) {
 		kScene8010FishermanSpeechBlue);
 	_primarySpeechOverlay.visible = true;
 	_primarySpeechOverlay.colorIndex = 0xfb;
-	_primarySpeechOverlay.lines = lines;
+	_primarySpeechOverlay.lines = Common::move(lines);
 	calculateSpeechOverlayBounds(_primarySpeechOverlay, kScene8010FishermanSpeechCenterX,
 		kScene8010FishermanSpeechTopY, true, _activeActorWorldY);
 

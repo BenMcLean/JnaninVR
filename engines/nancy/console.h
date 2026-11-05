@@ -59,6 +59,8 @@ private:
 #ifdef ENABLE_NANCY_V4
 	bool Cmd_listRecords(int argc, const char **argv);
 	bool Cmd_scriptExport(int argc, const char **argv);
+	bool Cmd_listManagers(int argc, const char **argv);
+	bool Cmd_cheatMode(int argc, const char **argv);
 #endif
 	bool Cmd_actionRecordExport(int argc, const char **argv);
 	bool Cmd_scanForActionRecordType(int argc, const char **argv);

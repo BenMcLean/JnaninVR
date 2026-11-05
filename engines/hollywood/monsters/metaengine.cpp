@@ -42,7 +42,6 @@ const ADExtraGuiOptionsMap optionsList[] = {
 			0
 		}
 	},
-
 	AD_EXTRA_GUI_OPTIONS_TERMINATOR
 };
 

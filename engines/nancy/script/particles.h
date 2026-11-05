@@ -23,6 +23,7 @@
 #define NANCY_SCRIPT_PARTICLES_H
 
 #include "common/array.h"
+#include "common/hashmap.h"
 #include "common/list.h"
 
 #include "graphics/managed_surface.h"
@@ -53,8 +54,9 @@ struct Particle {
 	uint32 color = 0;			// 0xAARRGGBB
 };
 
-// Nancy21's falling snow. A Particle record keeps making particles out of parts
-// of an image, which it moves along and draws until their life is over:
+// Nancy21's falling snow, and Nancy22's rain, hail and dust. A Particle record
+// keeps making particles out of parts of an image, which it moves along and
+// draws until their life is over:
 //
 //   AR:Particle({ ovl = "Flakes_OVL", frequency = 50, life = 6, perspective = ...,
 //                 stages = { { name = "velocity", minSpeed = 300, ... }, ... } })
@@ -64,12 +66,22 @@ struct Particle {
 // what it gives every particle once, when the record is made, instead of every
 // time a particle is made. The particles go through the "perspective"
 // projection, so they get smaller further off.
+//
+// From Nancy1New on, the stages are added after the record is made, under names
+// of the scripts' choosing, and the record hands them back by those names:
+//
+//   snow:AddVelocity("velocityStage", { minSpeed = 300, ... })
+//   snow.velocityStage
+//
+// Nancy23 draws the calligraphy puzzle with particles: a paused record whose
+// "path" stage follows the brush, and that the script steps with FastForward.
 class ParticleRecord : public Record {
 public:
 	ParticleRecord(SceneContext &context) : Record(context, "ND.ParticleAR") {}
 	~ParticleRecord() override;
 
 	void updateGraphics() override;
+	void registerGraphics() override;
 
 	// For the stages
 	Particle &getParticle(uint index) { return _particles[index]; }
@@ -77,8 +89,16 @@ public:
 	double getLife() const { return _life; }
 	const Graphics::ManagedSurface &getImage() const { return _image; }
 
+	// Runs the simulation through the given time at once
+	void simulate(double seconds);
+
+	// Adds a stage of a kind ("velocity", "fade"...) under a name, read from the
+	// table at the given index
+	void addNamedStage(const Common::String &kind, const Common::String &name, int tableIndex);
+
 protected:
 	void readTable(int tableIndex) override;
+	void runOnce() override;
 	void run(double sceneTime, double elapsedTime) override;
 	void onZChanged() override;
 	bool hasTransform() const override { return true; }
@@ -93,7 +113,6 @@ private:
 	};
 
 	void addStage(ParticleStage *stage);
-	void simulate(double seconds);
 	void step();
 	void spawn(uint count);
 	void grow();
@@ -111,14 +130,23 @@ private:
 	double _frequency = 0.0;	// particles a second
 	double _life = 0.0;			// seconds
 	ScriptMatrix _perspective;
+	bool _hasPerspective = false;	// Nancy22 has particles without one
 
-	double _stepTime = 0.0;
-	int _numSteps = 0;
-	double _spawnTime = 0.0;
-	int _numSpawned = 0;
+	Common::HashMap<Common::String, ParticleStage *> _namedStages;
+
+	// Both keep what is left of the time after the last whole step or particle
+	double _stepClock = 0.0;
+	double _spawnClock = 0.0;
+	double _spawnTime = 0.0;	// when the newest particles were made
+
+	bool _isPaused = false;		// Nancy23
+	double _fastForward = 0.0;	// seconds to run through when the record starts
 
 	RecordGraphic *_canvas = nullptr;
 };
+
+// The stages scripts get back from a record by name
+void registerParticleAPI(lua_State *L);
 
 } // End of namespace Script
 } // End of namespace Nancy

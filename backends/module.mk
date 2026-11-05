@@ -357,7 +357,7 @@ MODULE_OBJS += \
 	dialogs/win32/win32-dialogs.o \
 	fs/windows/windows-fs.o \
 	fs/windows/windows-fs-factory.o \
-	midi/windows.o \
+	midi/winmm.o \
 	plugins/win32/win32-provider.o \
 	printing/win32/win32-printman.o \
 	saves/windows/windows-saves.o \
@@ -400,8 +400,8 @@ MODULE_OBJS += \
 	text-to-speech/android/android-text-to-speech.o
 endif
 
-# Oboe headers need C++14...
-$(MODULE)/mixer/android/android-mixer.o: CXXFLAGS += "-std=c++14"
+# Oboe headers need C++14 and alignment when using new needs C++17
+$(MODULE)/mixer/android/android-mixer.o: CXXFLAGS += "-std=c++17"
 
 endif
 

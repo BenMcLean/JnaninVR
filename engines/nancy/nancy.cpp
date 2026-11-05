@@ -31,9 +31,9 @@
 #include "gui/message.h"
 
 #include "engines/nancy/nancy.h"
-#include "engines/nancy/resource.h"
-#include "engines/nancy/cif.h"
-#include "engines/nancy/iff.h"
+#include "engines/nancy/resource/resource.h"
+#include "engines/nancy/resource/cif.h"
+#include "engines/nancy/resource/iff.h"
 #include "engines/nancy/input.h"
 #include "engines/nancy/sound.h"
 #include "engines/nancy/graphics.h"
@@ -61,14 +61,15 @@ namespace Nancy {
 
 NancyEngine *g_nancy;
 
-NancyEngine::NancyEngine(OSystem *syst, const NancyGameDescription *gd) :
+NancyEngine::NancyEngine(GameType type, OSystem *syst, const ADGameDescription *gd) :
 		Engine(syst),
 		_gameDescription(gd),
+		_gameType(type),
 		_system(syst),
 		_datFileMajorVersion(1),
 		_datFileMinorVersion(0),
-		_false(gd->gameType <= kGameTypeNancy2 ? 1 : 0),
-		_true(gd->gameType <= kGameTypeNancy2 ? 2 : 1) {
+		_false(type <= kGameTypeNancy2 ? 1 : 0),
+		_true(type <= kGameTypeNancy2 ? 2 : 1) {
 
 	g_nancy = this;
 
@@ -109,9 +110,9 @@ NancyEngine::~NancyEngine() {
 	}
 }
 
-NancyEngine *NancyEngine::create(GameType type, OSystem *syst, const NancyGameDescription *gd) {
+NancyEngine *NancyEngine::create(GameType type, OSystem *syst, const ADGameDescription *gd) {
 	if (type >= kGameTypeVampire && type <= kGameTypeNancy32) {
-		return new NancyEngine(syst, gd);
+		return new NancyEngine(type, syst, gd);
 	}
 
 	error("Unknown GameType");
@@ -124,7 +125,16 @@ Common::Error NancyEngine::loadGameState(int slot) {
 		ConfMan.setInt("display_slot", slot, Common::ConfigManager::kTransientDomain);
 	}
 
+	// Nancy22's scripts know when a game is being loaded, by its name
+	if (State::Scene::hasInstance()) {
+		NancySceneState.setLoadName(save.isValid() && !save.getDescription().empty() ? save.getDescription() : "Saved game");
+	}
+
 	Common::Error result = Engine::loadGameState(slot);
+	if (State::Scene::hasInstance() && result.getCode() != Common::kNoError) {
+		NancySceneState.setLoadName("");
+	}
+
 	if (result.getCode() == Common::kNoError) {
 		if (_gameFlow.curState != NancyState::kScene)
 			destroyState(_gameFlow.curState);
@@ -198,23 +208,23 @@ const char *NancyEngine::getCopyrightString() const {
 }
 
 uint32 NancyEngine::getGameFlags() const {
-	return _gameDescription->desc.flags;
+	return _gameDescription->flags;
 }
 
 const char *NancyEngine::getGameId() const {
-	return _gameDescription->desc.gameId;
+	return _gameDescription->gameId;
 }
 
 GameType NancyEngine::getGameType() const {
-	return _gameDescription->gameType;
+	return _gameType;
 }
 
 Common::Language NancyEngine::getGameLanguage() const {
-	return _gameDescription->desc.language;
+	return _gameDescription->language;
 }
 
 Common::Platform NancyEngine::getPlatform() const {
-	return _gameDescription->desc.platform;
+	return _gameDescription->platform;
 }
 
 const StaticData &NancyEngine::getStaticData() const {
@@ -542,6 +552,12 @@ Common::Error NancyEngine::run() {
 
 	bool graphicsWereSuppressed = false;
 
+	// The frames follow each other at 60 a second, as the original, which waits
+	// for the display. Later games step what they move 60 times a second, so a
+	// frame that is a little short would make the scrolling jump.
+	const double kFrameMillis = 1000.0 / 60.0;
+	double nextFrameTime = _system->getMillis();
+
 	// Main loop
 	while (true) {
 		_input->processEvents();
@@ -549,7 +565,13 @@ Common::Error NancyEngine::run() {
 			break;
 		}
 
-		uint32 frameEndTime = _system->getMillis() + 16;
+		// A frame that came too late doesn't make the next ones shorter
+		nextFrameTime += kFrameMillis;
+		if (nextFrameTime < _system->getMillis()) {
+			nextFrameTime = _system->getMillis() + kFrameMillis;
+		}
+
+		uint32 frameEndTime = (uint32)nextFrameTime;
 
 		if (!graphicsWereSuppressed) {
 			_cursor->setCursorType(CursorManager::kNormalArrow);
@@ -946,6 +968,14 @@ void NancyEngine::bootScriptedGameEngine() {
 	flagTables.flags = flags;
 	runRequiredBootScript("Flags", flagTables);
 
+	// Nancy1New names the values and texts the scripts keep
+	if (getGameType() >= kGameTypeNancy1New) {
+		Script::BootTables tableTables;
+		tableTables.boot = boot;
+		runRequiredBootScript("Vars", tableTables);
+		runRequiredBootScript("Strs", tableTables);
+	}
+
 	Script::BootTables inventoryTables;
 	inventoryTables.inventory = inventory;
 	inventoryTables.boot = boot;
@@ -1144,7 +1174,7 @@ void NancyEngine::readDatFile() {
 	uint32 nextGameOffset = gameType == numGames ? datFile->size() : datFile->readUint32LE();
 	datFile->seek(thisGameOffset);
 
-	_staticData.readData(*datFile, _gameDescription->desc.language, nextGameOffset, major, minor);
+	_staticData.readData(*datFile, _gameDescription->language, nextGameOffset, major, minor);
 
 	delete datFile;
 }
@@ -1208,6 +1238,14 @@ void NancyEngine::populateStaticData() {
 		sci.musicChannels = { 0, 1, 2, 3, 4, 5 };
 		sci.sfxChannels = { 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23 };
 		sci.speechChannels = { 24, 25, 26, 27, 28, 29 };
+	}
+
+	if (getGameType() >= kGameTypeNancy22) {
+		// Nancy22 has three music channels, five for the sounds that go on from
+		// scene to scene, eight for ambience, ten for effects and four for voices
+		sci.musicChannels = { 0, 1, 2 };
+		sci.sfxChannels = { 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25 };
+		sci.speechChannels = { 26, 27, 28, 29 };
 	}
 }
 

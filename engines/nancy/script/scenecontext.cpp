@@ -26,9 +26,10 @@
 #include "engines/nancy/enginedata.h"
 #include "engines/nancy/input.h"
 #include "engines/nancy/nancy.h"
-#include "engines/nancy/resource.h"
+#include "engines/nancy/resource/resource.h"
 #include "engines/nancy/util.h"
 
+#include "engines/nancy/script/api.h"
 #include "engines/nancy/script/convo.h"
 #include "engines/nancy/script/graphnode.h"
 #include "engines/nancy/script/luabind.h"
@@ -75,6 +76,8 @@ SceneContext::~SceneContext() {
 		delete response;
 	}
 
+	forgetTaskCompletions(this);
+
 	for (GraphNode *node : _graphNodes) {
 		delete node;
 	}
@@ -109,13 +112,16 @@ bool SceneContext::load() {
 	const ScriptBootData *boot = (const ScriptBootData *)g_nancy->getEngineData("ScriptBootData");
 	if (boot) {
 		for (const Common::String &name : boot->includeFileNames) {
-			if (!_lua->runScript(name)) {
+			if (!include(name)) {
 				return false;
 			}
 		}
 	}
 
-	if (!_lua->runScript(_sceneName)) {
+	_isLoading = true;
+	const bool hasRun = _lua->runScript(_sceneName);
+	_isLoading = false;
+	if (!hasRun) {
 		return false;
 	}
 
@@ -175,6 +181,14 @@ Common::String SceneContext::findGlobalName(const Record *record) const {
 }
 
 bool SceneContext::include(const Common::String &name) {
+	if (g_nancy->getGameType() >= kGameTypeNancy21) {
+		if (_includedNames.contains(name)) {
+			return true;
+		}
+
+		_includedNames.setVal(name, true);
+	}
+
 	return _lua->runScript(name);
 }
 
@@ -202,6 +216,49 @@ void SceneContext::setSceneFunction(const char *name) {
 	lua_insert(L, -2);
 	lua_setfield(L, -2, name);
 	lua_pop(L, 1);
+}
+
+bool SceneContext::addManager(const Common::String &name) {
+	for (const ManagerFunction &manager : _managers) {
+		if (manager.name.equalsIgnoreCase(name)) {
+			return false;
+		}
+	}
+
+	ManagerFunction manager;
+	manager.name = name;
+	manager.reference = luaL_ref(getLua(), LUA_REGISTRYINDEX);
+	_managers.push_back(manager);
+	return true;
+}
+
+void SceneContext::getManagerNames(Common::Array<Common::String> &names) const {
+	for (const ManagerFunction &manager : _managers) {
+		names.push_back(manager.name);
+	}
+}
+
+bool SceneContext::describeManager(const Common::String &name, Common::String &text) {
+	for (const ManagerFunction &manager : _managers) {
+		if (!manager.name.equalsIgnoreCase(name)) {
+			continue;
+		}
+
+		lua_State *L = getLua();
+		lua_rawgeti(L, LUA_REGISTRYINDEX, manager.reference);
+		if (lua_pcall(L, 0, 1, 0) != 0) {
+			text = Common::String::format("Error in manager stringize function: %s", lua_tostring(L, -1));
+		} else if (!lua_isstring(L, -1)) {
+			text = Common::String::format("Return value from manager %s is not a string", manager.name.c_str());
+		} else {
+			text = lua_tostring(L, -1);
+		}
+
+		lua_pop(L, 1);
+		return true;
+	}
+
+	return false;
 }
 
 bool SceneContext::callSceneFunction(const char *name, int numArgs) {
@@ -260,6 +317,16 @@ bool SceneContext::skipSpeech() {
 	}
 
 	return hasSkipped;
+}
+
+void SceneContext::registerGraphics() {
+	for (Record *record : _records) {
+		record->registerGraphics();
+	}
+
+	for (Record *record : _newRecords) {
+		record->registerGraphics();
+	}
 }
 
 void SceneContext::end() {
@@ -325,8 +392,11 @@ bool SceneContext::receiveMessage(const Message &message, bool &wasTaken) {
 		return true;
 	}
 
+	// The records made this frame get messages as well, e.g. the managers of
+	// Nancy22, which the scripts of other scenes call on as soon as they load
 	bool hasReceiver = false;
-	const Common::Array<Record *> records = _records;
+	Common::Array<Record *> records = _records;
+	records.push_back(_newRecords);
 	for (Record *record : records) {
 		if (!record->hasMessagingName(message.target)) {
 			continue;
@@ -363,6 +433,7 @@ void SceneContext::run(double elapsedTime) {
 	}
 
 	renderAttachment();
+	applyGraphNodeChanges();
 
 	for (Record *record : _records) {
 		record->updateGraphics();
@@ -470,16 +541,39 @@ GraphNode *SceneContext::createGraphNode() {
 	return node;
 }
 
+// Nodes change many times a frame, e.g. the cars of Nancy22's driving game with
+// every step of the physics, so the records under them only catch up once the
+// frame is over. Their transform and z are always worked out when asked for.
 void SceneContext::onGraphNodeChanged(GraphNode *node) {
-	for (Record *record : _records) {
-		if (record->getParentNode() && record->getParentNode()->isUnder(node)) {
-			record->onParentNodeChanged();
+	for (const GraphNode *changed : _changedNodes) {
+		if (changed == node) {
+			return;
 		}
 	}
 
-	for (Record *record : _newRecords) {
-		if (record->getParentNode() && record->getParentNode()->isUnder(node)) {
-			record->onParentNodeChanged();
+	_changedNodes.push_back(node);
+}
+
+void SceneContext::applyGraphNodeChanges() {
+	// Catching up can change more nodes, e.g. the z of a Transformer
+	while (!_changedNodes.empty()) {
+		const Common::Array<GraphNode *> changedNodes = _changedNodes;
+		_changedNodes.clear();
+
+		Common::Array<Record *> records = _records;
+		records.push_back(_newRecords);
+		for (Record *record : records) {
+			const GraphNode *parent = record->getParentNode();
+			if (!parent) {
+				continue;
+			}
+
+			for (const GraphNode *node : changedNodes) {
+				if (parent->isUnder(node)) {
+					record->onParentNodeChanged();
+					break;
+				}
+			}
 		}
 	}
 }

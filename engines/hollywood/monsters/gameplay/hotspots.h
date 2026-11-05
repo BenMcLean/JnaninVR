@@ -23,7 +23,6 @@
 #define HOLLYWOOD_MONSTERS_GAMEPLAY_HOTSPOTS_H
 
 #include "common/array.h"
-#include "common/language.h"
 #include "common/rect.h"
 #include "common/str.h"
 #include "common/types.h"
@@ -31,14 +30,16 @@
 #include "hollywood/monsters/scenes/scene_data.h"
 
 namespace Graphics {
+struct HotspotInfo;
 struct Surface;
 }
 
 namespace Hollywood {
 
 class HollywoodFont;
+struct HollywoodGameStrings;
 
-Common::String inventoryActionCaption(Common::Language language, byte stripIndex);
+Common::String inventoryActionCaption(const HollywoodGameStrings &strings, byte stripIndex);
 
 struct SceneVerbActionRecord {
 	uint16 actionHandlerId;
@@ -65,6 +66,8 @@ public:
 
 	byte resolveItemAt(const Graphics::Surface &savedFramebuffer, uint16 cursorX, uint16 cursorY,
 		uint16 xOffset, uint16 yOffset) const;
+	void getHotspotPositions(Common::Array<Graphics::HotspotInfo> &hotspots,
+		const Graphics::Surface &savedFramebuffer, uint16 xOffset, uint16 yOffset) const;
 	byte defaultStripForItem(byte itemId) const;
 	bool hasVerbAction(byte itemId, byte stripIndex) const;
 	SceneVerbActionRecord verbActionRecord(byte itemId, byte stripIndex) const;
@@ -72,6 +75,7 @@ public:
 	SceneActionTarget actionTarget(byte itemId) const;
 	void setItemDefaultStrip(byte itemId, byte stripIndex);
 	void setItemName(byte itemId, const Common::String &name);
+	void setItemNames(const Common::Array<byte> &stageSmallRows);
 	void setActionTarget(byte itemId, const ScenePoint &interactionPoint, const ScenePoint &approachPoint);
 	void setActionInteraction(byte itemId, const ScenePoint &interactionPoint, byte facing);
 	// Claims pixels even when the resource maps them to another item.
@@ -113,7 +117,7 @@ private:
  */
 class SceneHoverCaption {
 public:
-	SceneHoverCaption(Common::Language language);
+	SceneHoverCaption(const HollywoodGameStrings &strings);
 
 	void reset();
 	void setCurrentStrip(byte stripIndex);
@@ -152,7 +156,7 @@ private:
 	Descriptor _lastDescriptor;
 	Common::String _captionText;
 	uint32 _timer;
-	Common::Language _language;
+	const HollywoodGameStrings &_strings;
 	byte _currentStrip;
 	byte _relationMode;
 	byte _primaryInventoryItem;

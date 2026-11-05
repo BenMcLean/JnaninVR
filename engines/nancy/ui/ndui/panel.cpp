@@ -508,6 +508,9 @@ bool Panel::takeAction(const Action &action) {
 
 		showItem((int16)action.value, action.type == kActionShowItem);
 		break;
+	case kActionCycleFocus:
+		cycleFocus();
+		break;
 	default:
 		return false;
 	}
@@ -563,7 +566,7 @@ void Panel::finishBlending() {
 	_isDirty = true;
 }
 
-// Every show needs a matching hide before the panel goes away
+// Before Nancy19, every show needs a matching hide before the panel goes away
 void Panel::show() {
 	++_showCount;
 	if (_isCollapsed) {
@@ -594,20 +597,31 @@ void Panel::setCollapsed(bool isCollapsed) {
 	}
 }
 
+// Nancy19 and up don't count: a hide always hides, and tells the scripts. Nancy25
+// opens the phone without showing its panel, and closes it by hiding that.
 void Panel::hide() {
-	--_showCount;
-	if (_showCount == 0) {
-		setVisible(false);
-		_isShownWhenExpanded = false;
-		if (_capture) {
-			_capture->_isPressed = false;
-			_capture = nullptr;
+	if (g_nancy->getGameType() < kGameTypeNancy19) {
+		--_showCount;
+		if (_showCount < 0) {
+			_showCount = 0;
+			return;
 		}
 
-		fireEvent(kEventHide);
-	} else if (_showCount < 0) {
+		if (_showCount > 0) {
+			return;
+		}
+	} else {
 		_showCount = 0;
 	}
+
+	setVisible(false);
+	_isShownWhenExpanded = false;
+	if (_capture) {
+		_capture->_isPressed = false;
+		_capture = nullptr;
+	}
+
+	fireEvent(kEventHide);
 }
 
 void Panel::fireEvent(int32 eventType) {
@@ -648,6 +662,10 @@ bool Panel::removeControl(const Common::String &name) {
 			}
 		}
 
+		if (_focus == control) {
+			_focus = nullptr;
+		}
+
 		if (_capture == control) {
 			_capture = nullptr;
 		}
@@ -665,6 +683,10 @@ EditBox *Panel::getKeyboardFocus() const {
 		return nullptr;
 	}
 
+	if (_focus && _focus->isVisible() && _focus->isEnabled()) {
+		return _focus;
+	}
+
 	for (EditBox *editBox : _editBoxes) {
 		if (editBox->isVisible() && editBox->isEnabled()) {
 			return editBox;
@@ -672,6 +694,27 @@ EditBox *Panel::getKeyboardFocus() const {
 	}
 
 	return nullptr;
+}
+
+// The edit box after the focused one, going around to the first
+void Panel::cycleFocus() {
+	EditBox *current = getKeyboardFocus();
+	if (!current) {
+		return;
+	}
+
+	uint start = 0;
+	while (_editBoxes[start] != current) {
+		++start;
+	}
+
+	for (uint i = 1; i <= _editBoxes.size(); ++i) {
+		EditBox *editBox = _editBoxes[(start + i) % _editBoxes.size()];
+		if (editBox->isVisible() && editBox->isEnabled()) {
+			_focus = editBox;
+			break;
+		}
+	}
 }
 
 bool Panel::isItemButton(const Common::String &name) const {

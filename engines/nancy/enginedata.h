@@ -1165,7 +1165,17 @@ struct ScriptBootData : public EngineData {
 	Common::Array<SystemFont> fonts;
 	Common::Array<FontColor> fontColors;
 
+	// Nancy23: font files of the game folder, which the fonts named like them
+	// use in place of a Windows font
+	Common::Array<Common::String> customFontFiles;
+
 	Common::Array<Player> players;	// in the order of PCUI::characters
+
+	// Nancy1New names every value (VarTable) and text (StrTable) the scripts
+	// keep beforehand; using any other name is an error
+	typedef Common::HashMap<Common::String, bool, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> NameSet;
+	NameSet valueNames;
+	NameSet textNames;
 };
 
 } // End of namespace Nancy

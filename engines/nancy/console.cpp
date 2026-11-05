@@ -32,10 +32,10 @@
 #include "engines/nancy/movieplayer.h"
 #include "engines/nancy/nancy.h"
 #include "engines/nancy/console.h"
-#include "engines/nancy/resource.h"
+#include "engines/nancy/resource/resource.h"
 #include "engines/nancy/sound.h"
-#include "engines/nancy/cif.h"
-#include "engines/nancy/iff.h"
+#include "engines/nancy/resource/cif.h"
+#include "engines/nancy/resource/iff.h"
 #include "engines/nancy/input.h"
 #include "engines/nancy/graphics.h"
 
@@ -69,6 +69,8 @@ NancyConsole::NancyConsole() : GUI::Debugger() {
 #ifdef ENABLE_NANCY_V4
 	registerCmd("list_records", WRAP_METHOD(NancyConsole, Cmd_listRecords));
 	registerCmd("script_export", WRAP_METHOD(NancyConsole, Cmd_scriptExport));
+	registerCmd("list_managers", WRAP_METHOD(NancyConsole, Cmd_listManagers));
+	registerCmd("cheat_mode", WRAP_METHOD(NancyConsole, Cmd_cheatMode));
 #endif
 	registerCmd("actionrecord_export", WRAP_METHOD(NancyConsole, Cmd_actionRecordExport));
 	registerCmd("scan_ar_type", WRAP_METHOD(NancyConsole, Cmd_scanForActionRecordType));
@@ -788,6 +790,7 @@ bool NancyConsole::Cmd_listRecords(int argc, const char **argv) {
 			if (showsFields) {
 				Common::Array<Common::String> fields;
 				record->describeFields(fields);
+				record->describeState(fields);
 				for (const Common::String &field : fields) {
 					debugPrintf("      %s\n", field.c_str());
 				}
@@ -795,6 +798,75 @@ bool NancyConsole::Cmd_listRecords(int argc, const char **argv) {
 		}
 
 		debugPrintf("\n");
+	}
+
+	return true;
+}
+
+// Nancy20: the cheat mode of the original, which the scripts ask for with
+// Game.cheatMode. It turns on views made for debugging the puzzles, like the
+// physics shapes of the Nancy22 driving game (Q).
+bool NancyConsole::Cmd_cheatMode(int argc, const char **argv) {
+	bool isOn = !NancySceneState.isCheatMode();
+	if (argc == 2 && !scumm_stricmp(argv[1], "on")) {
+		isOn = true;
+	} else if (argc == 2 && !scumm_stricmp(argv[1], "off")) {
+		isOn = false;
+	} else if (argc != 1) {
+		debugPrintf("Turns the cheat mode of the scripts of Nancy20 and later on or off.\n");
+		debugPrintf("Usage: %s [on|off]\n", argv[0]);
+		debugPrintf("Without an argument, toggles it.\n");
+		return true;
+	}
+
+	NancySceneState.setCheatMode(isOn);
+	debugPrintf("Cheat mode is %s\n", isOn ? "on" : "off");
+	return true;
+}
+
+// Nancy22: the managers the scripts registered with Log:AddManager, or what one
+// of them gives about itself. The original shows these in its cheat dialog.
+bool NancyConsole::Cmd_listManagers(int argc, const char **argv) {
+	if (argc > 2) {
+		debugPrintf("Lists the managers of the scripts, in Nancy22 and later.\n");
+		debugPrintf("Usage: %s [manager name]\n", argv[0]);
+		debugPrintf("With a name, prints what the manager says about itself.\n");
+		return true;
+	}
+
+	if (g_nancy->getGameType() < kGameTypeNancy22) {
+		debugPrintf("Managers are used from Nancy22 onwards\n");
+		return true;
+	}
+
+	if (g_nancy->getState() != NancyState::kScene) {
+		debugPrintf("Not in the kScene state\n");
+		return true;
+	}
+
+	// The managers all run in a stream of their own
+	State::SceneStream *stream = NancySceneState.getStreams().find(State::SceneStreamManager::getManagerStreamName());
+	Script::SceneContext *context = stream ? stream->getScriptScene() : nullptr;
+	if (!context) {
+		debugPrintf("No running stream %s\n", State::SceneStreamManager::getManagerStreamName());
+		return true;
+	}
+
+	if (argc == 2) {
+		Common::String text;
+		if (context->describeManager(argv[1], text)) {
+			debugPrintf("%s\n", text.c_str());
+		} else {
+			debugPrintf("No manager %s\n", argv[1]);
+		}
+
+		return true;
+	}
+
+	Common::Array<Common::String> names;
+	context->getManagerNames(names);
+	for (const Common::String &name : names) {
+		debugPrintf("%s\n", name.c_str());
 	}
 
 	return true;
@@ -1559,7 +1631,7 @@ bool NancyConsole::Cmd_getPlayerTime(int argc, const char **argv) {
 		time.getDays(),
 		time.getHours(),
 		time.getMinutes(),
-		(uint32)time);
+		time.getTotalMilliseconds());
 
 	auto *bootSummary = GetEngineData(BSUM);
 	if (bootSummary && bootSummary->endOfDayFlag != kEvNoEvent) {
@@ -1602,7 +1674,7 @@ bool NancyConsole::Cmd_setPlayerTime(int argc, const char **argv) {
 		time.getDays(),
 		time.getHours(),
 		time.getMinutes(),
-		(uint32)time);
+		time.getTotalMilliseconds());
 
 	return cmdExit(0, nullptr);
 }

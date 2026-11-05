@@ -98,6 +98,9 @@ public:
 	// Makes a record that ran start over. Only some kinds can.
 	bool reset();
 
+	// Nancy22: works like reset(), but makes the record active as well
+	bool restart();
+
 	// Draws an active record right away, where its transform puts it on the
 	// screen. Scripts do this for what hangs off the cursor.
 	void render();
@@ -120,8 +123,10 @@ public:
 	bool isActive() const { return _isActive && !_isDone; }
 	bool isDone() const { return _isDone; }
 	bool hasStarted() const { return _hasStarted; }
+	bool hasRunOnce() const { return _hasRunOnce; }
 	// Counted from the node the record is under, when it is under one
 	double getZ() const;
+	double getLocalZ() const { return _z; }
 
 	// Puts the record no closer to the player than the given z
 	void limitZ(double z);
@@ -130,6 +135,14 @@ public:
 	// The key is at stack index 2, and a new value at 3.
 	int getScriptField();
 	int setScriptField();
+
+	// What scripts stored in the record under a name, which the fields of its
+	// kind don't go through. AR:GetActualField (Nancy24) reads it.
+	void pushStoredValue(const char *name);
+
+	// Nancy24: clears everything scripts stored in the record, the function
+	// that says whether it is active as well
+	void clean();
 
 	// Calls a function a script stored in the record, with the record itself in
 	// front of the arguments on the stack. Returns false when there is no such
@@ -160,6 +173,10 @@ public:
 	// Shows or hides what the record draws, once the records of a frame have run
 	virtual void updateGraphics() {}
 
+	// Puts what the record draws back on the screen, after a change of the
+	// state of the engine took everything off it
+	virtual void registerGraphics() {}
+
 	// Enhancement: the player can skip what a scene plays. Whether the record is
 	// something that can be skipped, and what it does when the skipping begins.
 	virtual bool isSkippable() const { return false; }
@@ -176,6 +193,9 @@ public:
 
 	// For the debugger: what the scripts gave the record, as "name = value"
 	void describeFields(Common::Array<Common::String> &lines);
+
+	// For the console: what the kind of record is up to, beyond its fields
+	virtual void describeState(Common::Array<Common::String> &lines) const {}
 
 protected:
 	lua_State *getLua() const;
@@ -194,6 +214,9 @@ protected:
 	// Whether the record can start over, after getting itself ready for it
 	virtual bool prepareReset() { return false; }
 
+	// A paused record doesn't run at all, not even once, until it goes on
+	virtual bool isPaused() const { return false; }
+
 	// Whether the functions of the scripts take the place of what the record does
 	// by itself: Run, Render, and everything the player does
 	virtual bool isScripted() const { return false; }
@@ -211,8 +234,6 @@ protected:
 	virtual bool getField(const Common::String &key) { return false; }
 	virtual bool setField(const Common::String &key) { return false; }
 
-	// What scripts stored in the record
-	void pushStoredValue(const char *name);
 	void storeValue(const char *name);	// pops the value
 
 private:
